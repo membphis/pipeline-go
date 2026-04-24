@@ -1,0 +1,43 @@
+project:
+  name: sample-pipeline
+  description: A sample AI project pipeline demonstrating the orchestrator format
+
+milestones:
+  - name: setup
+    spec: |
+      Initialize the project structure with necessary configuration files,
+      dependency management, and development environment setup.
+    verify:
+      - ls -la
+      - python3 -c "import yaml; print('yaml available')"
+    tasks:
+      - name: init
+        prompt: Create a basic Python project structure with pyproject.toml, src/ directory, and tests/
+
+  - name: core-logic
+    depends_on: [setup]
+    spec: |
+      Implement the core business logic of the application, following the
+      architecture defined in the setup phase.
+    verify:
+      - python3 -m pytest tests/ -x -q
+    tasks:
+      - name: implement-core
+        prompt: |
+          Implement the main application logic:
+          1. Create data models
+          2. Implement API endpoints
+          3. Add validation layer
+
+  - name: polish
+    depends_on: [core-logic]
+    spec: |
+      Final polish including documentation, additional tests, and performance optimization.
+    verify:
+      - python3 -m pytest tests/ -x -q
+      - python3 -c "print('All checks passed')"
+    tasks:
+      - name: docs
+        prompt: Add comprehensive documentation and docstrings to all public APIs
+      - name: tests
+        prompt: Add integration tests covering the main use cases
