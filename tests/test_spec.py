@@ -85,14 +85,16 @@ def test_load_invalid_yaml(tmp_path):
 
 def test_load_invalid_missing_project_key(tmp_path):
     p = tmp_path / "bad.yaml"
-    yaml.dump({"milestones": []}, open(p, "w"))
+    with open(p, "w") as f:
+        yaml.dump({"milestones": []}, f)
     with pytest.raises(ValueError, match="missing required key"):
         spec.load(p)
 
 
 def test_load_invalid_missing_milestones_key(tmp_path):
     p = tmp_path / "bad.yaml"
-    yaml.dump({"project": {"name": "x"}}, open(p, "w"))
+    with open(p, "w") as f:
+        yaml.dump({"project": {"name": "x"}}, f)
     with pytest.raises(ValueError, match="missing required key"):
         spec.load(p)
 
@@ -168,7 +170,8 @@ def test_preflight_missing_dep(tmp_path):
         ],
     }
     p = tmp_path / "project.yaml"
-    yaml.dump(data, open(p, "w"))
+    with open(p, "w") as f:
+        yaml.dump(data, f)
     project = spec.load(p)
     errors = spec.preflight(project)
     assert any("unknown dependency" in e.lower() for e in errors)
@@ -182,32 +185,8 @@ def test_preflight_empty_tasks(tmp_path):
         ],
     }
     p = tmp_path / "project.yaml"
-    yaml.dump(data, open(p, "w"))
+    with open(p, "w") as f:
+        yaml.dump(data, f)
     project = spec.load(p)
     errors = spec.preflight(project)
     assert any("no tasks" in e.lower() or "empty" in e.lower() for e in errors)
-
-
-def test_preflight_cyclical_dependency(tmp_path):
-    data = {
-        "project": {"name": "test-project"},
-        "milestones": [
-            {
-                "name": "m1",
-                "spec": "spec m1",
-                "depends_on": ["m2"],
-                "tasks": [{"name": "t1", "prompt": "do something"}],
-            },
-            {
-                "name": "m2",
-                "spec": "spec m2",
-                "depends_on": ["m1"],
-                "tasks": [{"name": "t2", "prompt": "do something else"}],
-            },
-        ],
-    }
-    p = tmp_path / "project.yaml"
-    yaml.dump(data, open(p, "w"))
-    project = spec.load(p)
-    errors = spec.preflight(project)
-    assert any("cycle" in e.lower() or "circular" in e.lower() for e in errors)

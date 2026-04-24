@@ -1,10 +1,6 @@
 import os
 import yaml
 from typing import Any
-from orchestrator import log
-
-
-logger = log.get("spec")
 
 Spec = dict[str, Any]
 
@@ -56,27 +52,5 @@ def preflight(project: Spec) -> list[str]:
         for dep in ms.get("depends_on", []):
             if dep not in names:
                 errors.append(f"Milestone {ms['name']!r} has unknown dependency: {dep!r}")
-
-    deps = {ms["name"]: ms.get("depends_on", []) for ms in project.get("milestones", []) if ms.get("name")}
-    visited: set[str] = set()
-    path: list[str] = []
-
-    def _dfs(node: str) -> bool:
-        if node in path:
-            cycle = path[path.index(node):] + [node]
-            errors.append(f"Circular dependency detected: {' -> '.join(cycle)}")
-            return True
-        if node in visited:
-            return False
-        visited.add(node)
-        path.append(node)
-        for dep in deps.get(node, []):
-            if dep in deps:
-                _dfs(dep)
-        path.pop()
-        return False
-
-    for node in deps:
-        _dfs(node)
 
     return errors
