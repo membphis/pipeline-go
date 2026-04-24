@@ -15,9 +15,11 @@ def _clean_logger():
 
 def test_setup_configures_root_logger():
     log.setup()
-    root = logging.getLogger("orchestrator")
-    assert root.level == logging.INFO
-    assert len(root.handlers) >= 1
+    logger = logging.getLogger("orchestrator")
+    assert logger.level == logging.INFO
+    assert len(logger.handlers) >= 1
+    for h in logger.handlers:
+        assert h.level == logging.INFO
 
 
 def test_get_returns_child_logger():
@@ -27,5 +29,16 @@ def test_get_returns_child_logger():
 
 def test_setup_respects_custom_level():
     log.setup(level=logging.DEBUG)
-    root = logging.getLogger("orchestrator")
-    assert root.level == logging.DEBUG
+    logger = logging.getLogger("orchestrator")
+    assert logger.level == logging.DEBUG
+    for h in logger.handlers:
+        assert h.level == logging.DEBUG
+
+
+def test_setup_updates_handler_level_on_recall():
+    log.setup(level=logging.INFO)
+    log.setup(level=logging.DEBUG)
+    logger = logging.getLogger("orchestrator")
+    assert logger.level == logging.DEBUG
+    for h in logger.handlers:
+        assert h.level == logging.DEBUG

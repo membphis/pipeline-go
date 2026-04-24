@@ -16,6 +16,9 @@ def setup(level: int = logging.INFO):
         )
         handler.setFormatter(fmt)
         logger.addHandler(handler)
+    else:
+        for handler in logger.handlers:
+            handler.setLevel(level)
 
 
 def get(name: str) -> logging.Logger:
