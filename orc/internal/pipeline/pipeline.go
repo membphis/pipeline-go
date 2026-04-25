@@ -110,6 +110,9 @@ func (p *Pipeline) Run() int {
 		p.logger.Info("starting milestone", "name", msName, "branch", branchName)
 		prompt := computeMilestoneSpec(ms, projectSpec.Milestones, pipeState, allHandoffNotes)
 		p.logger.Info("running milestone", "name", msName, "prompt_bytes", len(prompt))
+		fmt.Println("========= PROMPT =========")
+		fmt.Println(prompt)
+		fmt.Println("==========================")
 
 		result, err := session.Run(prompt, 0)
 		if err != nil || result.ReturnCode != 0 {
@@ -145,6 +148,10 @@ func (p *Pipeline) Run() int {
 		review.Phase(msName, ms.Spec, deduped, allVerifyResults)
 
 		if p.Config.Branch == "" {
+			if err := git.AddAll(); err != nil {
+				p.logger.Error("git add failed", "error", err)
+				return 1
+			}
 			if err := git.Commit("Milestone " + msName); err != nil {
 				p.logger.Error("commit failed", "error", err)
 				return 1
@@ -157,8 +164,7 @@ func (p *Pipeline) Run() int {
 				return 1
 			}
 			if err := git.SquashMerge(branchName); err != nil {
-				p.logger.Error("squash merge failed", "error", err)
-				return 1
+				p.logger.Warn("squash merge failed", "error", err)
 			}
 		}
 	}
@@ -182,6 +188,11 @@ func (p *Pipeline) Run() int {
 }
 
 func detectDefaultBranch() string {
+	for _, name := range []string{"main", "master"} {
+		if git.BranchExists(name) {
+			return name
+		}
+	}
 	if b, err := git.CurrentBranch(); err == nil {
 		return b
 	}
@@ -199,8 +210,9 @@ func computeMilestoneSpec(ms *spec.Milestone, all []spec.Milestone, pipeState *s
 	if len(ms.Tasks) > 0 {
 		parts = append(parts, "## Tasks\n")
 		for _, t := range ms.Tasks {
-			parts = append(parts, fmt.Sprintf("### %s\n\n%s\n", t.Name, t.Prompt))
+			parts = append(parts, fmt.Sprintf("- %s\n", t.Name))
 		}
+		parts = append(parts, "\n")
 	}
 
 	if pipeState != nil {
@@ -227,12 +239,19 @@ func computeMilestoneSpec(ms *spec.Milestone, all []spec.Milestone, pipeState *s
 		parts = append(parts, "## Upcoming Milestones\n")
 		for _, m := range remaining {
 			specPreview := m.Spec
-			if len(specPreview) > 80 {
-				specPreview = specPreview[:80]
+			if len([]rune(specPreview)) > 80 {
+				specPreview = string([]rune(specPreview)[:80])
 			}
 			parts = append(parts, fmt.Sprintf("- %s: %s...\n", m.Name, specPreview))
 		}
 	}
 
 	return strings.TrimSpace(strings.Join(parts, "\n"))
+}
+
+func truncate(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	return s[:max] + "..."
 }

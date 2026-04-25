@@ -29,11 +29,16 @@ func CurrentBranch() (string, error) {
 }
 
 func CreateBranch(name string, base ...string) error {
-	args := []string{"checkout", "-b", name}
+	args := []string{"checkout", "-B", name}
 	if len(base) > 0 && base[0] != "" {
 		args = append(args, base[0])
 	}
 	_, err := run(args...)
+	return err
+}
+
+func AddAll() error {
+	_, err := run("add", "-A")
 	return err
 }
 
@@ -62,6 +67,11 @@ func Tag(name string, message ...string) error {
 	}
 	_, err := run("tag", name)
 	return err
+}
+
+func BranchExists(name string) bool {
+	_, err := run("rev-parse", "--verify", name)
+	return err == nil
 }
 
 func IsClean() bool {

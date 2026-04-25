@@ -9,7 +9,7 @@ func TestLoadSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Project.Name != "api-gateway" {
+	if s.Project.Name != "simple-http-proxy" {
 		t.Fatalf("unexpected project name: %s", s.Project.Name)
 	}
 	if len(s.Milestones) != 4 {
@@ -33,11 +33,11 @@ func TestGetMilestone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ms := GetMilestone(s, "路由层")
+	ms := GetMilestone(s, "M1-http-listener")
 	if ms == nil {
 		t.Fatal("expected milestone")
 	}
-	if ms.Name != "路由层" {
+	if ms.Name != "M1-http-listener" {
 		t.Fatalf("unexpected name: %s", ms.Name)
 	}
 }
@@ -56,8 +56,8 @@ func TestPreflightDuplicate(t *testing.T) {
 	s := &Spec{
 		Project: Project{Name: "test"},
 		Milestones: []Milestone{
-			{Name: "m1", Tasks: []TaskSpec{{Name: "t1", Prompt: "p"}}},
-			{Name: "m1", Tasks: []TaskSpec{{Name: "t2", Prompt: "p"}}},
+			{Name: "m1", Tasks: []TaskSpec{{Name: "t1"}}},
+			{Name: "m1", Tasks: []TaskSpec{{Name: "t2"}}},
 		},
 	}
 	errs := Preflight(s)
@@ -70,7 +70,7 @@ func TestPreflightMissingDep(t *testing.T) {
 	s := &Spec{
 		Project: Project{Name: "test"},
 		Milestones: []Milestone{
-			{Name: "m1", DependsOn: []string{"nonexistent"}, Tasks: []TaskSpec{{Name: "t1", Prompt: "p"}}},
+			{Name: "m1", DependsOn: []string{"nonexistent"}, Tasks: []TaskSpec{{Name: "t1"}}},
 		},
 	}
 	errs := Preflight(s)

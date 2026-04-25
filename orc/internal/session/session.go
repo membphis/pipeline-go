@@ -2,6 +2,7 @@ package session
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -21,12 +22,14 @@ func Run(prompt string, timeout time.Duration) (*Result, error) {
 	if err != nil {
 		return nil, fmt.Errorf("opencode not found on $PATH: install via 'pip install opencode' or download from https://opencode.ai")
 	}
-	cmd := execCommand(path, prompt)
+	fmt.Fprintf(os.Stderr, "command: opencode run --dangerously-skip-permissions (prompt=%d bytes)\n", len(prompt))
+
+	cmd := execCommand(path, "run", "--dangerously-skip-permissions", prompt)
 	cmd.Stdin = os.Stdin
 
 	var stdout, stderr strings.Builder
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	cmd.Stdout = io.MultiWriter(&stdout, os.Stdout)
+	cmd.Stderr = io.MultiWriter(&stderr, os.Stderr)
 
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("starting opencode: %w", err)

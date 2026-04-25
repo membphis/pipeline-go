@@ -19,14 +19,14 @@ func TestComputeMilestoneSpec(t *testing.T) {
 		Name: "m1",
 		Spec: "test spec",
 		Tasks: []spec.TaskSpec{
-			{Name: "t1", Prompt: "do something"},
+			{Name: "t1"},
 		},
 	}
 	result := computeMilestoneSpec(ms, nil, nil, nil)
 	if !strings.Contains(result, "m1") {
 		t.Fatal("missing milestone name")
 	}
-	if !strings.Contains(result, "do something") {
-		t.Fatal("missing task prompt")
+	if !strings.Contains(result, "t1") {
+		t.Fatal("missing task name")
 	}
 }

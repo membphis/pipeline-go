@@ -13,8 +13,7 @@ type Project struct {
 }
 
 type TaskSpec struct {
-	Name   string `yaml:"name"`
-	Prompt string `yaml:"prompt"`
+	Name string `yaml:"name"`
 }
 
 type Milestone struct {
