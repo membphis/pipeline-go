@@ -2,13 +2,9 @@ import math
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from orchestrator.handoff import HandoffNote
+
 DegradeStrategy = Literal["no_verify", "no_handoff", "minimal"]
-
-
-@dataclass
-class HandoffNote:
-    source: str
-    content: str
 
 
 @dataclass

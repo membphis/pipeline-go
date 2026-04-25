@@ -4,8 +4,24 @@ import sys
 from typing import Any
 
 from orchestrator import log, spec, topo, state, git, session, verify, handoff, context, review
+from orchestrator.verify import VerifyResult
 
 logger = log.get("main")
+
+
+def _detect_default_branch() -> str:
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["git", "symbolic-ref", "refs/remotes/origin/HEAD"],
+            capture_output=True, text=True, check=False,
+        )
+        if result.returncode == 0:
+            ref = result.stdout.strip()
+            return ref.split("/")[-1]
+    except Exception:
+        pass
+    return "main"
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -93,8 +109,12 @@ class Pipeline:
         logger.info("Milestone order: %s", ordered)
 
         pipeline_state = state.State(milestones, path=os.path.join(self.root, "state.yaml"))
+        default_branch = _detect_default_branch()
 
+        seen_handoff_paths: set[str] = set()
         all_handoff_notes: list[Any] = []
+        all_verify_results: list[VerifyResult] = []
+        has_failures = False
 
         for ms_name in ordered:
             ms = spec.get_milestone(project_spec, ms_name)
@@ -111,7 +131,7 @@ class Pipeline:
                     logger.warning("Working tree not clean, stashing changes")
             else:
                 branch_name = f"{ms_name}-pipeline"
-                git.checkout("main")
+                git.checkout(default_branch)
                 git.create_branch(branch_name)
 
             logger.info("Starting milestone %r on branch %r", ms_name, branch_name)
@@ -125,44 +145,57 @@ class Pipeline:
                 pipeline_state.set(ms_name, "completed")
             else:
                 pipeline_state.set(ms_name, "failed")
+                has_failures = True
                 logger.warning("Milestone %r session failed (code %d)", ms_name, result.returncode)
 
             pipeline_state.save()
 
             verify_specs = ms.get("verify")
+            v_results: list[VerifyResult] = []
             if verify_specs:
-                v_results = verify.run_verify(verify_specs)
+                raw = verify.run_verify(verify_specs)
+                if isinstance(raw, VerifyResult):
+                    v_results = [raw]
+                else:
+                    v_results = raw
+                all_verify_results.extend(v_results)
 
-            handoff_notes = handoff.collect(self.root)
-            all_handoff_notes.extend(handoff_notes)
+            new_notes = handoff.collect(self.root)
+            new_notes = [n for n in new_notes if n.source not in seen_handoff_paths]
+            for n in new_notes:
+                seen_handoff_paths.add(n.source)
+            all_handoff_notes.extend(new_notes)
 
             review.review_phase(
                 milestone=ms,
-                handoff_notes=handoff_notes,
-                verify_results=v_results if verify_specs else [],
+                handoff_notes=new_notes,
+                verify_results=v_results,
             )
 
             if not self.branch_override:
-                git.commit(f"Milestone {ms_name}")
-                git.tag(f"{ms_name}-done")
-                git.checkout("main")
-                git.squash_merge(branch_name)
+                try:
+                    git.commit(f"Milestone {ms_name}")
+                    git.tag(f"{ms_name}-done")
+                    git.checkout(default_branch)
+                    git.squash_merge(branch_name)
+                except Exception as e:
+                    logger.error("Git operation failed for milestone %r: %s", ms_name, e)
+                    return 1
 
-        all_v_results: list[Any] = []
         review.review_final(
             project_name=project_name,
             milestones=milestones,
             handoff_notes=all_handoff_notes,
-            verify_results=all_v_results,
+            verify_results=all_verify_results,
         )
 
         if pipeline_state.all_completed():
             git.tag(f"{project_name}-v1.0")
             logger.info("Pipeline completed successfully")
+            return 0
         else:
             logger.warning("Pipeline completed with some milestones not completed")
-
-        return 0
+            return 1 if has_failures else 0
 
 
 def main() -> None:

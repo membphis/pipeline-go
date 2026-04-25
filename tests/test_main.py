@@ -149,7 +149,7 @@ def test_run_pipeline_session_failure_continues():
         pipeline = main.Pipeline(spec_path="p.yaml", root=".", extra_specs=[], branch=None)
         result = pipeline.run()
 
-    assert result == 0
+    assert result == 1
     assert mock_session.run.call_count >= 2
 
 

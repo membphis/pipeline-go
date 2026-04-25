@@ -29,27 +29,39 @@ def create_branch(name: str, base: str | None = None) -> None:
     args = ["checkout", "-b", name]
     if base:
         args.append(base)
-    _run(*args)
+    result = _run(*args)
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed to create branch {name!r}: {result.stderr.strip()}")
 
 
 def commit(message: str) -> None:
-    _run("commit", "-m", message)
+    result = _run("commit", "-m", message)
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed to commit: {result.stderr.strip()}")
 
 
 def checkout(branch: str) -> None:
-    _run("checkout", branch)
+    result = _run("checkout", branch)
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed to checkout {branch!r}: {result.stderr.strip()}")
 
 
 def squash_merge(branch: str) -> None:
-    _run("merge", "--squash", branch)
-    _run("commit", "-m", f"Squash merge {branch}")
+    result = _run("merge", "--squash", branch)
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed to squash-merge {branch!r}: {result.stderr.strip()}")
+    result = _run("commit", "-m", f"Squash merge {branch}")
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed to commit squash-merge: {result.stderr.strip()}")
 
 
 def tag(name: str, message: str | None = None) -> None:
     if message:
-        _run("tag", "-a", name, "-m", message)
+        result = _run("tag", "-a", name, "-m", message)
     else:
-        _run("tag", name)
+        result = _run("tag", name)
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed to tag {name!r}: {result.stderr.strip()}")
 
 
 def is_clean() -> bool:
