@@ -1,4 +1,4 @@
-module orchestrator
+module orc
 
 go 1.23.0
 

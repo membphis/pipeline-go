@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"orchestrator/internal/spec"
+	"orc/internal/spec"
 )
 
 func TestDetectDefaultBranch(t *testing.T) {

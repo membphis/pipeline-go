@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"orchestrator/internal/context"
+	"orc/internal/context"
 )
 
 func TestBuildReviewPrompt(t *testing.T) {

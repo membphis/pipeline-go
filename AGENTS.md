@@ -1,16 +1,16 @@
-# orchestrator — AI Project Pipeline Orchestrator
+# orc — AI Project Pipeline Orchestrator
 
 ## Quick start
 ```bash
-go build -o orchestrator .              # build binary
-./orchestrator --help                   # verify
-go test ./... -v                        # run all tests
-go test ./internal/topo/ -v             # single package
+go build -o orc .              # build binary
+./orc --help                   # verify
+go test ./... -v               # run all tests
+go test ./internal/topo/ -v    # single package
 ```
 
 ## Architecture
-- **Entrypoint**: `orchestrator/main.go` → CLI: `orchestrator [--spec project.yaml] [--root .] [--branch X]`
-- **Config**: `go.mod` module `orchestrator`, single dep `gopkg.in/yaml.v3`, Go 1.22+
+- **Entrypoint**: `orc/main.go` → CLI: `orc [--spec project.yaml] [--root .] [--branch X]`
+- **Config**: `go.mod` module `orc`, single dep `gopkg.in/yaml.v3`, Go 1.22+
 - **Core loop** (`pipeline.Run()`): load YAML → preflight → topo sort → for each milestone: create git branch → run opencode session → run verify → collect HANDOFF.md → phase review → squash-merge → tag
 - **Modules**: `main.go` (CLI), `internal/pipeline/` (orchestration), `spec/` (YAML load+validate), `topo/` (sort+cycle detection), `state/` (persistence), `session/` (opencode subprocess), `git/` (branch/commit/tag/merge), `handoff/` (HANDOFF.md collector), `verify/` (shell commands), `review/` (phase/final review), `context/` (bundle+token budget), `log/` (slog wrapper)
 
@@ -41,4 +41,4 @@ go test ./internal/topo/ -v             # single package
 - Mock external commands via `var execCommand = exec.Command` pattern (git, session, verify)
 - `session` tests patch `execCommand` to avoid real opencode calls
 - `topo`, `spec`, `state`, `context` have no external deps, easily testable
-- Run `go test ./... -v` from `orchestrator/` after any change
+- Run `go test ./... -v` from `orc/` after any change

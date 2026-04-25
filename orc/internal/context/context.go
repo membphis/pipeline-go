@@ -4,8 +4,8 @@ import (
 	"math"
 	"strings"
 
-	"orchestrator/internal/handoff"
-	"orchestrator/internal/verify"
+	"orc/internal/handoff"
+	"orc/internal/verify"
 )
 
 type DegradeStrategy string

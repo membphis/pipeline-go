@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"orchestrator/internal/handoff"
-	"orchestrator/internal/verify"
+	"orc/internal/handoff"
+	"orc/internal/verify"
 )
 
 func TestCountTokensEmpty(t *testing.T) {

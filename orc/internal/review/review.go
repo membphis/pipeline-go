@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"time"
 
-	"orchestrator/internal/context"
-	"orchestrator/internal/handoff"
-	"orchestrator/internal/session"
-	"orchestrator/internal/verify"
+	"orc/internal/context"
+	"orc/internal/handoff"
+	"orc/internal/session"
+	"orc/internal/verify"
 )
 
 type Result struct {

@@ -6,16 +6,16 @@ import (
 	"path/filepath"
 	"strings"
 
-	"orchestrator/internal/context"
-	"orchestrator/internal/git"
-	"orchestrator/internal/handoff"
-	"orchestrator/internal/log"
-	"orchestrator/internal/review"
-	"orchestrator/internal/session"
-	"orchestrator/internal/spec"
-	"orchestrator/internal/state"
-	"orchestrator/internal/topo"
-	"orchestrator/internal/verify"
+	"orc/internal/context"
+	"orc/internal/git"
+	"orc/internal/handoff"
+	"orc/internal/log"
+	"orc/internal/review"
+	"orc/internal/session"
+	"orc/internal/spec"
+	"orc/internal/state"
+	"orc/internal/topo"
+	"orc/internal/verify"
 )
 
 type Config struct {

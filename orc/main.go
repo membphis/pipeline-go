@@ -4,8 +4,8 @@ import (
 	"flag"
 	"os"
 
-	"orchestrator/internal/log"
-	"orchestrator/internal/pipeline"
+	"orc/internal/log"
+	"orc/internal/pipeline"
 )
 
 func main() {

@@ -13,4 +13,4 @@ state.yaml
 /tmp/
 
 # Go binary
-orchestrator/orchestrator
+orc/orc

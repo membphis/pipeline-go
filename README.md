@@ -8,10 +8,10 @@ AI 项目流水线编排器，将复杂项目分解为多个里程碑（Mileston
 
 ```bash
 # Build
-cd orchestrator && go build -o orchestrator .
+cd orc && go build -o orc .
 
 # Run
-./orchestrator/orchestrator [--spec project.yaml] [--root .] [--branch X]
+./orc/orc [--spec project.yaml] [--root .] [--branch X]
 ```
 
 ## Usage
@@ -36,16 +36,16 @@ Run:
 
 ```bash
 # Basic
-orchestrator
+orc
 
 # Custom spec
-orchestrator --spec path/to/project.yaml
+orc --spec path/to/project.yaml
 
 # Combine specs
-orchestrator --spec base.yaml --extra-spec features.yaml
+orc --spec base.yaml --extra-spec features.yaml
 
 # Existing branch (skip git branch creation)
-orchestrator --branch existing-branch
+orc --branch existing-branch
 ```
 
 ## Requirements
@@ -57,15 +57,15 @@ orchestrator --branch existing-branch
 ## Development
 
 ```bash
-cd orchestrator
+cd orc
 go test ./... -v
-go build -o orchestrator .
+go build -o orc .
 ```
 
 ## Project Structure
 
 ```
-orchestrator/
+orc/
 ├── main.go                    # CLI 入口
 ├── internal/
 │   ├── pipeline/              # Pipeline 核心编排
