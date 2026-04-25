@@ -1,5 +1,4 @@
-import pytest
-from unittest.mock import patch, Mock, call
+from unittest.mock import patch, Mock
 from orchestrator import main
 
 
@@ -45,7 +44,7 @@ def test_compute_milestone_spec_includes_prompt():
 
 def test_compute_milestone_spec_includes_state():
     ms = {"name": "m1", "tasks": [{"prompt": "p"}]}
-    with patch("orchestrator.main.state.State") as MockState:
+    with patch("orchestrator.main.state.State"):
         mock_state = Mock()
         mock_state.get.return_value = "pending"
         mock_state.get_all.return_value = {"m1": "pending", "m2": "completed"}

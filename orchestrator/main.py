@@ -3,7 +3,7 @@ import os
 import sys
 from typing import Any
 
-from orchestrator import log, spec, topo, state, git, session, verify, handoff, context, review
+from orchestrator import log, spec, topo, state, git, session, verify, handoff, review
 from orchestrator.verify import VerifyResult
 
 logger = log.get("main")

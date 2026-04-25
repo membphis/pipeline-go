@@ -1,5 +1,4 @@
 import subprocess
-from typing import Any
 
 from orchestrator import log
 

@@ -1,5 +1,4 @@
 import pytest
-import yaml
 from orchestrator import state
 
 
@@ -88,7 +87,6 @@ def test_load_corrupted_file(tmp_path):
 def test_timestamps(tmp_path):
     ms = [{"name": "m1"}]
     st = state.State(ms, path=str(tmp_path / "state.yaml"))
-    import time
     st.set("m1", "completed")
     saved = st._data["milestones"]["m1"]
     assert "timestamp" in saved

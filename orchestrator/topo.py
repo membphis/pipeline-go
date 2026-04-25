@@ -29,7 +29,11 @@ def sort(milestones: list[Spec]) -> list[str]:
 
     def _visit(node: str) -> None:
         if node in in_progress:
-            cycle_path = [n for n in order if n == node or cycle_path]
+            cycle_path: list[str] = []
+            for n in order:
+                cycle_path.append(n)
+                if n == node:
+                    break
             cycle_path.append(node)
             raise CycleError(cycle_path)
         if node in visited:
