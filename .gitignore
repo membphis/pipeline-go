@@ -7,3 +7,7 @@ state.yaml
 /dist/
 .venv/
 *.egg-info/
+
+# Go
+/bin/
+/tmp/
