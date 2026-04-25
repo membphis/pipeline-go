@@ -1,43 +1,175 @@
 project:
-  name: sample-pipeline
-  description: A sample AI project pipeline demonstrating the orchestrator format
+  name: api-gateway
+  description: 轻量级 HTTP API 网关，支持路由、认证、限流和监控。
 
 milestones:
-  - name: setup
+  - name: 项目脚手架
     spec: |
-      Initialize the project structure with necessary configuration files,
-      dependency management, and development environment setup.
+      初始化 Go 模块、依赖管理、配置加载器和骨架 HTTP 服务器。
+      用 Docker 容器化应用。
     verify:
-      - ls -la
-      - python3 -c "import yaml; print('yaml available')"
+      - go version
+      - go build ./...
+      - test -f Dockerfile
     tasks:
-      - name: init
-        prompt: Create a basic Python project structure with pyproject.toml, src/ directory, and tests/
-
-  - name: core-logic
-    depends_on: [setup]
-    spec: |
-      Implement the core business logic of the application, following the
-      architecture defined in the setup phase.
-    verify:
-      - python3 -m pytest tests/ -x -q
-    tasks:
-      - name: implement-core
+      - name: 初始化项目
         prompt: |
-          Implement the main application logic:
-          1. Create data models
-          2. Implement API endpoints
-          3. Add validation layer
+          在项目根目录初始化 Go 模块。
+          创建 go.mod，模块名 api-gateway。
+          创建 cmd/gateway/main.go — 监听 :8080 的最小 HTTP 服务器，包含 /healthz 端点。
+          创建 internal/config/config.go — YAML 配置结构体，包含 Server.Port、Auth.Enabled、RateLimit.RPS。
+          添加 .gitignore，忽略二进制文件和 .env。
 
-  - name: polish
-    depends_on: [core-logic]
+      - name: 安装依赖
+        prompt: |
+          添加 Go 依赖：chi 路由、zap 日志、viper 配置。
+          集成 viper 加载 config.yaml，支持环境变量回退。
+          cmd/gateway/main.go 启动时解析配置并通过 zap 打印。
+
+      - name: Docker 化
+        prompt: |
+          编写 Dockerfile — 多阶段构建（golang:1.22-alpine 构建阶段，distroless 运行阶段）。
+          编写 docker-compose.yml，含端口映射、配置卷、健康检查。
+          编写 .dockerignore，排除开发文件。
+
+      - name: Makefile
+        prompt: |
+          编写 Makefile，包含 build、run、test、lint、clean、docker-build、docker-run 目标。
+          添加 help 目标，列出所有可用命令。
+
+  - name: 路由层
+    depends_on: [项目脚手架]
     spec: |
-      Final polish including documentation, additional tests, and performance optimization.
+      实现核心 HTTP 路由引擎：路径参数提取、
+      中间件链和插件式处理器注册系统。
     verify:
-      - python3 -m pytest tests/ -x -q
-      - python3 -c "print('All checks passed')"
+      - go vet ./...
+      - go test ./internal/router/...
+      - go build ./...
     tasks:
-      - name: docs
-        prompt: Add comprehensive documentation and docstrings to all public APIs
-      - name: tests
-        prompt: Add integration tests covering the main use cases
+      - name: 路由核心
+        prompt: |
+          在 internal/router/ 中：
+          定义 Route 结构体（Method、Pattern、Handler、Middlewares）。
+          定义 Router 接口（Register、ServeHTTP、Use）。
+          实现 ChiRouter 封装 chi.Mux。
+          Middleware 类型 = func(http.Handler) http.Handler。
+          测试：路由注册、方法匹配、404 处理。
+
+      - name: 路径参数
+        prompt: |
+          实现 URLParam(key string) 辅助函数，从请求上下文提取参数。
+          支持 /users/{id}、/groups/{gid}/members/{mid} 模式。
+          通过 chi 的 URLParam 解析参数的中间件。
+          测试：参数提取、路由冲突、尾部斜杠处理。
+
+      - name: 处理器注册
+        prompt: |
+          在 internal/handler/ 中：
+          定义 HandlerFunc = func(http.ResponseWriter, *http.Request) error。
+          实现 Registry，将路由模式映射到处理器工厂。
+          默认错误处理器，将 HandlerFunc 错误转为 JSON 响应。
+          适配器将 HandlerFunc 转为 http.Handler，含 panic 恢复。
+          测试：注册、错误包装、恢复。
+
+      - name: 中间件链
+        prompt: |
+          在 internal/router/ 中实现中间件链构建器：
+          Chain 类型将多个中间件组合为一个。
+          支持对特定路由或整个路由器应用中间件。
+          RequestID 中间件，注入 X-Request-Id。
+          Logger 中间件，记录 method、path、duration。
+          测试：链顺序、RequestID 传播、日志输出。
+
+  - name: 认证与限流
+    depends_on: [路由层]
+    spec: |
+      添加 API Key 和 JWT 认证，以及令牌桶限流。
+      全部集成到路由中间件。
+    verify:
+      - go test ./internal/auth/...
+      - go test ./internal/ratelimit/...
+      - go build ./...
+    tasks:
+      - name: API Key 认证
+        prompt: |
+          在 internal/auth/ 中：
+          APIKeyAuthenticator 验证 X-API-Key 头部，对照静态映射表。
+          KeyProvider 接口、InMemoryKeyProvider 实现。
+          中间件：缺失/无效 Key 返回 401，在上下文中设置 X-User-ID。
+          可配置跳过路径（/healthz）。
+          测试：有效 Key、无效 Key、缺失头部、跳过路径。
+
+      - name: JWT 认证
+        prompt: |
+          在 internal/auth/ 中：
+          JWTConfig 包含 HMAC 密钥、签发者、过期时间。
+          JWT 中间件解析 Authorization: Bearer <token>，验证声明。
+          Claim 结构体：UserID、Role、ExpiresAt。
+          测试用 Token 生成辅助函数。
+          认证链：API Key 或 JWT（任一通过即可）。
+          测试：有效 JWT、过期、签名错误、格式错误。
+
+      - name: 令牌桶
+        prompt: |
+          在 internal/ratelimit/ 中：
+          TokenBucket 带可配置 RPS 和突发量。
+          RateLimiter 中间件以 X-User-ID 或客户端 IP 为 key。
+          InMemoryStore 带定期过期清理。
+          响应头：X-RateLimit-Limit、X-RateLimit-Remaining、X-RateLimit-Reset。
+          超出时返回 429 及 Retry-After。
+          测试：限额内、超限、重置、并发安全。
+
+      - name: 安全中间件
+        prompt: |
+          在 internal/middleware/ 中：
+          CORS 中间件，可配来源、方法、头部。
+          安全头部：X-Content-Type-Options、X-Frame-Options、CSP、HSTS。
+          请求大小限制中间件（可配置最大字节数）。
+          测试：CORS 预检请求、头部存在、超大请求拒绝。
+
+  - name: 监控与代理
+    depends_on: [认证与限流]
+    spec: |
+      实现反向代理、结构化日志、Prometheus 指标、
+      健康检查和优雅关闭。
+    verify:
+      - go vet ./...
+      - go test ./internal/proxy/...
+      - go test ./internal/metrics/...
+    tasks:
+      - name: 反向代理
+        prompt: |
+          在 internal/proxy/ 中：
+          ReverseProxy 将请求转发到上游主机。
+          上游配置：目标 URL、超时、最大空闲连接数、熔断阈值。
+          代理中间件修改 Host、X-Forwarded-For、X-Real-IP。
+          响应改写：3xx 时更新 Location 头部。
+          错误处理：上游超时 → 502、无上游 → 503。
+          测试：基本代理、头部传播、超时、熔断。
+
+      - name: 请求日志
+        prompt: |
+          基于 zap 的结构化请求日志中间件：
+          记录 method、path、status、duration、客户端 IP、User-Agent。
+          敏感头部脱敏（Authorization、X-API-Key）。
+          慢请求警告（可配置阈值，默认 1s）。
+          测试：日志格式、脱敏、慢请求检测。
+
+      - name: Prometheus 指标
+        prompt: |
+          在 internal/metrics/ 中：
+          Prometheus 计数器：requests_total、requests_duration_seconds。
+          标签：method、path、status_code、client_id。
+          按请求记录数据的 Metrics 中间件。
+          /metrics 端点使用 promhttp.Handler（跳过认证）。
+          测试：指标值、直方图桶、/metrics 输出格式。
+
+      - name: 健康检查与关闭
+        prompt: |
+          增强健康检查：
+          /healthz — 存活检查（始终 200）。
+          /readyz — 就绪检查（检测上游连通性）。
+          优雅关闭：信号处理器、连接排空、日志刷盘。
+          启动日志：打印配置摘要、监听地址、已启用特性。
+          测试：端点响应、关闭顺序。
