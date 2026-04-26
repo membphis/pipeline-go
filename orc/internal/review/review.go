@@ -50,10 +50,10 @@ func buildReviewPrompt(reviewType string, projectName string, milestones []conte
 	return bundle, prompt
 }
 
-func Phase(milestoneID, milestoneName, milestoneSpec, workDir string, handoffNotes []handoff.Note, verifyResults []verify.Result) (*Result, error) {
+func Phase(milestoneID, milestoneName, milestoneSpec, workDir string, handoffNotes []handoff.Note, verifyResults []verify.Result, model string) (*Result, error) {
 	ms := []context.MilestoneInfo{{Name: milestoneName, Spec: milestoneSpec}}
 	_, prompt := buildReviewPrompt("phase", milestoneID, ms, handoffNotes, verifyResults)
-	result, err := session.Run(milestoneName+"-review", prompt, workDir, 5*time.Minute)
+	result, err := session.Run(milestoneName+"-review", prompt, workDir, 5*time.Minute, model)
 	if err != nil {
 		return nil, err
 	}
@@ -64,9 +64,9 @@ func Phase(milestoneID, milestoneName, milestoneSpec, workDir string, handoffNot
 	}, nil
 }
 
-func Final(projectName, workDir string, milestones []context.MilestoneInfo, handoffNotes []handoff.Note, verifyResults []verify.Result) (*Result, error) {
+func Final(projectName, workDir string, milestones []context.MilestoneInfo, handoffNotes []handoff.Note, verifyResults []verify.Result, model string) (*Result, error) {
 	_, prompt := buildReviewPrompt("final", projectName, milestones, handoffNotes, verifyResults)
-	result, err := session.Run("final-review-"+projectName, prompt, workDir, 5*time.Minute)
+	result, err := session.Run("final-review-"+projectName, prompt, workDir, 5*time.Minute, model)
 	if err != nil {
 		return nil, err
 	}

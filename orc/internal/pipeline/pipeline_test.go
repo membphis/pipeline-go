@@ -11,7 +11,7 @@ import (
 	"orc/internal/state"
 )
 
-func TestComputeMilestoneSpec(t *testing.T) {
+func TestBuildExecPrompt(t *testing.T) {
 	ms := &spec.Milestone{
 		ID:   "m1",
 		Name: "Milestone One",
@@ -19,7 +19,7 @@ func TestComputeMilestoneSpec(t *testing.T) {
 			{ID: "s1", Description: "test spec", TaskCount: 2, TestCount: 2, EstMinutes: 15, SpecFile: "specs/m1.md"},
 		},
 	}
-	result := computeMilestoneSpec(ms, nil, nil, nil, ".", ".")
+	result := buildExecPrompt(ms, nil, nil, nil, ".")
 	if !strings.Contains(result, "Milestone One") {
 		t.Fatal("missing milestone name")
 	}
@@ -31,6 +31,32 @@ func TestComputeMilestoneSpec(t *testing.T) {
 	}
 	if !strings.Contains(result, "Write tests first") {
 		t.Fatal("missing TDD instruction")
+	}
+	if !strings.Contains(result, "PLAN.md") {
+		t.Fatal("missing plan reference")
+	}
+}
+
+func TestBuildPlanPrompt(t *testing.T) {
+	ms := &spec.Milestone{
+		ID:   "m1",
+		Name: "Milestone One",
+		Specs: []spec.SpecItem{
+			{ID: "s1", Description: "test spec", TaskCount: 2, TestCount: 2, EstMinutes: 15, SpecFile: "specs/m1.md"},
+		},
+	}
+	result := buildPlanPrompt(ms, ".")
+	if !strings.Contains(result, "Milestone One") {
+		t.Fatal("missing milestone name")
+	}
+	if !strings.Contains(result, "Write Only") {
+		t.Fatal("missing Write Only instruction")
+	}
+	if !strings.Contains(result, "PLAN.md") {
+		t.Fatal("missing plan path")
+	}
+	if strings.Contains(result, "Phase 2") {
+		t.Fatal("plan prompt should not contain Phase 2+")
 	}
 }
 

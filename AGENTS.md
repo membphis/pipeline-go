@@ -14,9 +14,9 @@ go test ./internal/topo/ -v    # single package
 ```
 
 ## Architecture
-- **Entrypoint**: `orc/main.go` → CLI: `orc [--spec project.yaml] [--root .]`; also supports `-s` shorthand and positional `--extra-spec <path>` for combining YAMLs
+- **Entrypoint**: `orc/main.go` → CLI: `orc [--spec project.yaml] [--root .] [--plan-model MODEL] [--exec-model MODEL]`; also supports `-s` shorthand and positional `--extra-spec <path>` for combining YAMLs
 - **Config**: `go.mod` module `orc`, single dep `gopkg.in/yaml.v3`, Go 1.23
-- **Core loop** (`pipeline.Run()`): load YAML → preflight → topo sort → for each milestone: build prompt (spec content + TDD instructions + state + handoff) → run opencode session → verify → collect HANDOFF.md → phase review (per-milestone opencode session) → all-completed log
+- **Core loop** (`pipeline.Run()`): load YAML → preflight → topo sort → for each milestone: plan session (Phase 1, plan-model) → exec session (Phase 2-5, exec-model) → verify → collect HANDOFF.md → phase review (per-milestone opencode session, exec-model) → all-completed log
 - **Modules**: `main.go` (CLI), `internal/pipeline/` (orchestration), `spec/` (YAML load+validate), `topo/` (sort+cycle detection), `state/` (persistence), `session/` (opencode subprocess), `git/` (repo init, scaffold, tag), `handoff/` (HANDOFF.md collector), `verify/` (shell commands), `review/` (phase review), `context/` (bundle+token budget), `log/` (slog wrapper)
 
 ## Key conventions
@@ -32,7 +32,7 @@ go test ./internal/topo/ -v    # single package
 - `specs[].spec_file` is resolved relative to `--root`
 - `specs[].test_count` > 0 triggers TDD instructions in the prompt
 - `verify` can be `string` or `[]string`; exit code 0 = pass
-- Each milestone = one opencode session, no branch creation
+- Each milestone = two opencode sessions + one review session: plan (Phase 1, plan-model), exec (Phase 2-5, exec-model), phase review (exec-model); no branch creation
 - Handoff notes: `**/HANDOFF*.md` collected after each milestone (written to `.orc_history/HANDOFF-{id}.md` by sessions)
 - State: `state.yaml` (gitignored)
 - Init scaffold: creates `README.md`, `.gitignore` (with `.orc_history/` entry), `.orc_history/.gitignore` (with `*`)

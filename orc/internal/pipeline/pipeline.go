@@ -22,6 +22,8 @@ type Config struct {
 	SpecPath   string
 	Root       string
 	ExtraSpecs []string
+	PlanModel  string
+	ExecModel  string
 }
 
 type Pipeline struct {
@@ -90,6 +92,11 @@ func (p *Pipeline) Run() int {
 	}
 	root = p.Config.Root
 
+	// Model fallback: if only ExecModel is set, use it for plan too
+	if p.Config.PlanModel == "" {
+		p.Config.PlanModel = p.Config.ExecModel
+	}
+
 	seenHandoffPaths := make(map[string]bool)
 	var allHandoffNotes []handoff.Note
 	var allVerifyResults []verify.Result
@@ -125,19 +132,41 @@ func (p *Pipeline) Run() int {
 		pipeState.Set(msID, state.StatusInProgress)
 		pipeState.Save()
 
-		p.logger.Info("starting milestone", "name", msID)
-		prompt := computeMilestoneSpec(ms, projectSpec.Milestones, pipeState, allHandoffNotes, root, cwd)
-		p.logger.Info("running milestone", "name", msID, "prompt_bytes", len(prompt))
+		// Phase 1: Plan session
+		p.logger.Info("starting plan session", "name", msID)
+		planPrompt := buildPlanPrompt(ms, cwd)
+		p.logger.Info("running plan session", "name", msID, "prompt_bytes", len(planPrompt), "model", p.Config.PlanModel)
+		planResult, planErr := session.Run(msID+"-plan", planPrompt, root, 0, p.Config.PlanModel)
+		if planErr != nil || planResult.ReturnCode != 0 {
+			rc := -1
+			if planResult != nil {
+				rc = planResult.ReturnCode
+			}
+			p.logger.Error("plan session failed", "name", msID, "code", rc, "error", planErr,
+				"plan_model", p.Config.PlanModel, "plan_path", filepath.Join(root, ".orc_history", "PLAN.md"))
+			pipeState.Set(msID, state.StatusFailed)
+			pipeState.Save()
+			fmt.Fprintf(os.Stderr, "\nERROR: Plan session for milestone %q failed (exit code %d).\n", msID, rc)
+			fmt.Fprintf(os.Stderr, "Plan model: %s\n", p.Config.PlanModel)
+			fmt.Fprintf(os.Stderr, "PLAN.md not written to %s\n", filepath.Join(root, ".orc_history", "PLAN.md"))
+			fmt.Fprintf(os.Stderr, "Fix your configuration and re-run.\n")
+			return 1
+		}
+		p.logger.Info("plan session completed", "name", msID)
 
-		result, err := session.Run(msID, prompt, root, 0)
-		if err != nil || result.ReturnCode != 0 {
+		// Phase 2-5: Exec session
+		p.logger.Info("starting exec session", "name", msID)
+		execPrompt := buildExecPrompt(ms, projectSpec.Milestones, pipeState, allHandoffNotes, cwd)
+		p.logger.Info("running exec session", "name", msID, "prompt_bytes", len(execPrompt), "model", p.Config.ExecModel)
+		execResult, execErr := session.Run(msID+"-exec", execPrompt, root, 0, p.Config.ExecModel)
+		if execErr != nil || execResult.ReturnCode != 0 {
 			pipeState.Set(msID, state.StatusFailed)
 			hasFailures = true
 			rc := -1
-			if result != nil {
-				rc = result.ReturnCode
+			if execResult != nil {
+				rc = execResult.ReturnCode
 			}
-			p.logger.Warn("session failed", "name", msID, "code", rc, "error", err)
+			p.logger.Warn("exec session failed", "name", msID, "code", rc, "error", execErr)
 			pipeState.Save()
 			continue
 		}
@@ -162,9 +191,13 @@ func (p *Pipeline) Run() int {
 			}
 		}
 
-		if _, err := review.Phase(ms.ID, ms.Name, buildSpecContent(ms, cwd), root, allHandoffNotes, allVerifyResults); err != nil {
-			p.logger.Warn("phase review failed", "name", msID, "error", err)
+		if reviewResult, reviewErr := review.Phase(ms.ID, ms.Name, buildSpecContent(ms, cwd), root, allHandoffNotes, allVerifyResults, p.Config.ExecModel); reviewErr != nil {
+			p.logger.Error("phase review failed", "name", msID, "error", reviewErr)
+			fmt.Fprintf(os.Stderr, "\nERROR: Phase review for milestone %q failed.\n", msID)
+			fmt.Fprintf(os.Stderr, "Review the output above and fix the issues, then re-run.\n")
+			return 1
 		} else {
+			_ = reviewResult
 			p.logger.Info("phase review completed", "name", msID)
 		}
 	}
@@ -242,7 +275,33 @@ func (p *Pipeline) ensureRoot(pipeState *state.State) error {
 	return nil
 }
 
-func computeMilestoneSpec(ms *spec.Milestone, all []spec.Milestone, pipeState *state.State, handoffNotes []handoff.Note, rootDir, cwd string) string {
+func buildPlanPrompt(ms *spec.Milestone, cwd string) string {
+	var parts []string
+	parts = append(parts, fmt.Sprintf("# Milestone: %s\n", ms.Name))
+	parts = append(parts, "## Git Rules\n")
+	parts = append(parts, "CRITICAL: Do NOT create, switch, or merge git branches. All work on the CURRENT branch only.\n")
+	parts = append(parts, "After code review and quality checks pass, create a git commit on the current branch.\n")
+	parts = append(parts, "You may use `git status`, `git diff`, `git log`, `git add`, `git commit` for tracking progress.\n\n")
+
+	if len(ms.Specs) > 0 {
+		parts = append(parts, "## Specs\n")
+		for _, s := range ms.Specs {
+			parts = append(parts, fmt.Sprintf("### %s\n", s.ID))
+			if s.SpecFile != "" {
+				absPath := filepath.Join(cwd, s.SpecFile)
+				parts = append(parts, fmt.Sprintf("- Read `%s` for all requirements.\n", absPath))
+			}
+		}
+	}
+
+	parts = append(parts, "## Plan Phase\n")
+	parts = append(parts, "1. Load the `writing-plans` skill and create a detailed implementation plan\n")
+	parts = append(parts, "2. Write the plan to `.orc_history/PLAN.md`\n")
+	parts = append(parts, "3. When writing-plans asks \"Execution Handoff\", choose \"Write Only\" — do NOT execute\n")
+	return strings.TrimSpace(strings.Join(parts, "\n"))
+}
+
+func buildExecPrompt(ms *spec.Milestone, all []spec.Milestone, pipeState *state.State, handoffNotes []handoff.Note, cwd string) string {
 	var parts []string
 
 	parts = append(parts, fmt.Sprintf("# Milestone: %s\n", ms.Name))
@@ -263,11 +322,10 @@ func computeMilestoneSpec(ms *spec.Milestone, all []spec.Milestone, pipeState *s
 		}
 	}
 
+	parts = append(parts, "## Plan\n")
+	parts = append(parts, "Read `.orc_history/PLAN.md` for the implementation plan.\n\n")
+
 	parts = append(parts, "## Development Process\n")
-	parts = append(parts, "### Phase 1: Plan\n")
-	parts = append(parts, "1. Load the `writing-plans` skill and create a detailed implementation plan\n")
-	parts = append(parts, "2. Write the plan to `.orc_history/PLAN.md`\n")
-	parts = append(parts, "3. **When writing-plans presents its \"Execution Handoff\" question, choose \"Inline Execution\" and proceed immediately to Phase 2 — do not ask the user**\n\n")
 	parts = append(parts, "### Phase 2: Execute\n")
 	parts = append(parts, "1. Load the `executing-plans` skill and execute `PLAN.md` using **inline** mode\n")
 	parts = append(parts, "2. Follow the plan step by step to implement the spec\n")

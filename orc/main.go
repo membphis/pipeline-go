@@ -13,6 +13,8 @@ func main() {
 	specPath := flag.String("spec", "project.yaml", "Path to project.yaml")
 	specShort := flag.String("s", "project.yaml", "Path to project.yaml (shorthand)")
 	root := flag.String("root", "", "Project root directory (required)")
+	planModel := flag.String("plan-model", "", "Model for Phase 1 planning (e.g. deepseek/deepseek-r1)")
+	execModel := flag.String("exec-model", "", "Model for Phase 2-5 execution and review")
 	flag.Parse()
 
 	if *root == "" {
@@ -41,6 +43,8 @@ func main() {
 		SpecPath:   finalSpec,
 		Root:       *root,
 		ExtraSpecs: extraSpecs,
+		PlanModel:  *planModel,
+		ExecModel:  *execModel,
 	}
 
 	p := pipeline.New(cfg)
