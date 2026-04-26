@@ -17,12 +17,13 @@ type Result struct {
 	Stderr     string
 }
 
-func Run(prompt string, timeout time.Duration) (*Result, error) {
+func Run(promptName, prompt string, timeout time.Duration) (*Result, error) {
 	path, err := exec.LookPath("opencode")
 	if err != nil {
 		return nil, fmt.Errorf("opencode not found on $PATH: install via 'pip install opencode' or download from https://opencode.ai")
 	}
-	fmt.Fprintf(os.Stderr, "command: opencode run --dangerously-skip-permissions (prompt=%d bytes)\n", len(prompt))
+
+	fmt.Fprintf(os.Stderr, "\n=== prompt[%s] (%d bytes) ===\n%s\n=== end prompt[%s] ===\n", promptName, len(prompt), prompt, promptName)
 
 	cmd := execCommand(path, "run", "--dangerously-skip-permissions", prompt)
 	cmd.Stdin = os.Stdin

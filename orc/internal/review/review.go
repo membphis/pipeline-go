@@ -45,7 +45,7 @@ func buildReviewPrompt(reviewType string, projectName string, milestones []conte
 func Phase(milestoneName, milestoneSpec string, handoffNotes []handoff.Note, verifyResults []verify.Result) (*Result, error) {
 	ms := []context.MilestoneInfo{{Name: milestoneName, Spec: milestoneSpec}}
 	_, prompt := buildReviewPrompt("phase", milestoneName, ms, handoffNotes, verifyResults)
-	result, err := session.Run(prompt, 5*time.Minute)
+	result, err := session.Run(milestoneName+"-review", prompt, 5*time.Minute)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +58,7 @@ func Phase(milestoneName, milestoneSpec string, handoffNotes []handoff.Note, ver
 
 func Final(projectName string, milestones []context.MilestoneInfo, handoffNotes []handoff.Note, verifyResults []verify.Result) (*Result, error) {
 	_, prompt := buildReviewPrompt("final", projectName, milestones, handoffNotes, verifyResults)
-	result, err := session.Run(prompt, 5*time.Minute)
+	result, err := session.Run("final-review-"+projectName, prompt, 5*time.Minute)
 	if err != nil {
 		return nil, err
 	}

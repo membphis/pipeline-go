@@ -91,7 +91,7 @@ func (p *Pipeline) Run() int {
 		prompt := computeMilestoneSpec(ms, projectSpec.Milestones, pipeState, allHandoffNotes, p.Config.Root)
 		p.logger.Info("running milestone", "name", msID, "prompt_bytes", len(prompt))
 
-		result, err := session.Run(prompt, 0)
+		result, err := session.Run(msID, prompt, 0)
 		if err != nil || result.ReturnCode != 0 {
 			pipeState.Set(msID, state.StatusFailed)
 			hasFailures = true
@@ -160,13 +160,9 @@ func computeMilestoneSpec(ms *spec.Milestone, all []spec.Milestone, pipeState *s
 	if len(ms.Specs) > 0 {
 		parts = append(parts, "## Specs\n")
 		for _, s := range ms.Specs {
-			parts = append(parts, fmt.Sprintf("### %s: %s\n", s.ID, s.Description))
-			parts = append(parts, fmt.Sprintf("- Tasks: %d | Est: %d min\n", s.TaskCount, s.EstMinutes))
-			if s.TestCount > 0 {
-				parts = append(parts, fmt.Sprintf("- Tests: %d\n", s.TestCount))
-			}
+			parts = append(parts, fmt.Sprintf("### %s\n", s.ID))
 			if s.SpecFile != "" {
-				parts = append(parts, fmt.Sprintf("- Spec file: %s\n", s.SpecFile))
+				parts = append(parts, fmt.Sprintf("- Read `%s` for all requirements.\n", s.SpecFile))
 			}
 		}
 	}
@@ -202,15 +198,7 @@ func computeMilestoneSpec(ms *spec.Milestone, all []spec.Milestone, pipeState *s
 	if len(remaining) > 0 {
 		parts = append(parts, "## Upcoming Milestones\n")
 		for _, m := range remaining {
-			var descParts []string
-			for _, s := range m.Specs {
-				descParts = append(descParts, s.Description)
-			}
-			preview := strings.Join(descParts, "; ")
-			if len([]rune(preview)) > 80 {
-				preview = string([]rune(preview)[:80])
-			}
-			parts = append(parts, fmt.Sprintf("- %s: %s...\n", m.Name, preview))
+			parts = append(parts, fmt.Sprintf("- %s\n", m.ID))
 		}
 	}
 
@@ -220,13 +208,9 @@ func computeMilestoneSpec(ms *spec.Milestone, all []spec.Milestone, pipeState *s
 func buildSpecContent(ms *spec.Milestone, rootDir string) string {
 	var parts []string
 	for _, s := range ms.Specs {
-		parts = append(parts, fmt.Sprintf("### %s: %s\n", s.ID, s.Description))
-		parts = append(parts, fmt.Sprintf("- Tasks: %d | Est: %d min\n", s.TaskCount, s.EstMinutes))
-		if s.TestCount > 0 {
-			parts = append(parts, fmt.Sprintf("- Tests: %d\n", s.TestCount))
-		}
+		parts = append(parts, fmt.Sprintf("### %s\n", s.ID))
 		if s.SpecFile != "" {
-			parts = append(parts, fmt.Sprintf("- Spec file: %s\n", s.SpecFile))
+			parts = append(parts, fmt.Sprintf("- Read `%s` for all requirements.\n", s.SpecFile))
 		}
 	}
 	return strings.TrimSpace(strings.Join(parts, "\n"))
