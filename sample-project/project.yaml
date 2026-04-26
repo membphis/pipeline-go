@@ -1,6 +1,6 @@
 project:
-  name: simple-http-proxy
-  description: "A minimal HTTP forward proxy demo for orc"
+  name: simple-calc-server
+  description: "A minimal HTTP calculator API demo for orc"
 
 milestones:
   - id: m1-http-listener
@@ -11,37 +11,26 @@ milestones:
         description: HTTP Listener Setup
         spec_file: sample-project/m1-http-listener-design.md
         task_count: 2
-        est_minutes: 15
+        est_minutes: 5
 
-  - id: m2-forwarding-handler
-    name: Forwarding Handler
+  - id: m2-calc-api
+    name: Calculator API
     order: 2
     depends_on: [m1-http-listener]
     specs:
-      - id: m2-s1-proxy
-        description: Forward Proxy Implementation
-        spec_file: sample-project/m2-forwarding-handler-design.md
-        task_count: 3
-        est_minutes: 20
-
-  - id: m3-observability
-    name: Observability
-    order: 3
-    depends_on: [m2-forwarding-handler]
-    specs:
-      - id: m3-s1-obs
-        description: Logging and Graceful Shutdown
-        spec_file: sample-project/m3-observability-design.md
-        task_count: 2
-        est_minutes: 15
-
-  - id: m4-verify
-    name: Verification
-    order: 4
-    depends_on: [m3-observability]
-    specs:
-      - id: m4-s1-verify
-        description: Integration Verification
-        spec_file: sample-project/m4-verify-design.md
+      - id: m2-s1-calc
+        description: Calculator API Implementation
+        spec_file: sample-project/m2-calc-api-design.md
         task_count: 2
         est_minutes: 10
+
+  - id: m3-verify
+    name: Verification
+    order: 3
+    depends_on: [m2-calc-api]
+    specs:
+      - id: m3-s1-verify
+        description: Final Verification
+        spec_file: sample-project/m3-verify-design.md
+        task_count: 2
+        est_minutes: 5

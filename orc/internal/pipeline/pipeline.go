@@ -84,6 +84,27 @@ func (p *Pipeline) Run() int {
 			continue
 		}
 
+		if pipeState.IsCompleted(msID) {
+			p.logger.Info("skipping completed milestone", "name", msID)
+			if ms.Verify != nil {
+				vResults, err := verify.Run(ms.Verify, 0)
+				if err == nil {
+					allVerifyResults = append(allVerifyResults, vResults...)
+					if !verify.AllSuccessful(vResults) {
+						p.logger.Warn("some verify commands failed", "name", msID)
+					}
+				}
+			}
+			newNotes, _ := handoff.Collect(p.Config.Root)
+			for _, n := range newNotes {
+				if !seenHandoffPaths[n.Source] {
+					seenHandoffPaths[n.Source] = true
+					allHandoffNotes = append(allHandoffNotes, n)
+				}
+			}
+			continue
+		}
+
 		pipeState.Set(msID, state.StatusInProgress)
 		pipeState.Save()
 
@@ -91,7 +112,7 @@ func (p *Pipeline) Run() int {
 		prompt := computeMilestoneSpec(ms, projectSpec.Milestones, pipeState, allHandoffNotes, p.Config.Root)
 		p.logger.Info("running milestone", "name", msID, "prompt_bytes", len(prompt))
 
-		result, err := session.Run(msID, prompt, 0)
+		result, err := session.Run(msID, prompt, p.Config.Root, 0)
 		if err != nil || result.ReturnCode != 0 {
 			pipeState.Set(msID, state.StatusFailed)
 			hasFailures = true
@@ -126,14 +147,14 @@ func (p *Pipeline) Run() int {
 		}
 		allHandoffNotes = append(allHandoffNotes, deduped...)
 
-		review.Phase(msID, buildSpecContent(ms, p.Config.Root), deduped, allVerifyResults)
+		review.Phase(msID, buildSpecContent(ms, p.Config.Root), p.Config.Root, deduped, allVerifyResults)
 	}
 
 	var msInfos []context.MilestoneInfo
 	for _, ms := range projectSpec.Milestones {
 		msInfos = append(msInfos, context.MilestoneInfo{Name: ms.Name, Spec: buildSpecContent(&ms, p.Config.Root)})
 	}
-	review.Final(projectSpec.Project.Name, msInfos, allHandoffNotes, allVerifyResults)
+	review.Final(projectSpec.Project.Name, p.Config.Root, msInfos, allHandoffNotes, allVerifyResults)
 
 	if pipeState.AllCompleted() {
 		git.Tag(projectSpec.Project.Name + "-v1.0")
@@ -153,9 +174,9 @@ func computeMilestoneSpec(ms *spec.Milestone, all []spec.Milestone, pipeState *s
 	parts = append(parts, fmt.Sprintf("# Milestone: %s\n", ms.Name))
 
 	parts = append(parts, "## Git Rules\n")
-	parts = append(parts, "CRITICAL: Do NOT create, switch, or merge git branches. Do NOT make git commits.\n")
-	parts = append(parts, "All work must be done on the CURRENT branch without any git write operations.\n")
-	parts = append(parts, "You may use `git status`, `git diff`, `git log` for reading state only.\n\n")
+	parts = append(parts, "CRITICAL: Do NOT create, switch, or merge git branches. All work on the CURRENT branch only.\n")
+	parts = append(parts, "After completing each spec (tests passing), create a git commit on the current branch.\n")
+	parts = append(parts, "You may use `git status`, `git diff`, `git log`, `git add`, `git commit` for tracking progress.\n\n")
 
 	if len(ms.Specs) > 0 {
 		parts = append(parts, "## Specs\n")
@@ -168,12 +189,13 @@ func computeMilestoneSpec(ms *spec.Milestone, all []spec.Milestone, pipeState *s
 	}
 
 	parts = append(parts, "## Development Process\n")
-	parts = append(parts, "Follow Test-Driven Development (TDD):\n")
-	parts = append(parts, "1. Write tests first (decide how many based on the actual changes needed)\n")
-	parts = append(parts, "2. Verify they fail correctly\n")
-	parts = append(parts, "3. Write minimal implementation to pass\n")
-	parts = append(parts, "4. Verify all tests pass\n")
-	parts = append(parts, "5. Refactor while keeping tests green\n")
+	parts = append(parts, "### Phase 1: Plan\n")
+	parts = append(parts, "1. Load the `writing-plans` skill and create a detailed implementation plan\n")
+	parts = append(parts, "2. Write the plan to `PLAN.md` in the project root\n\n")
+	parts = append(parts, "### Phase 2: Execute\n")
+	parts = append(parts, "1. Load the `executing-plans` skill and execute `PLAN.md` using **inline** mode\n")
+	parts = append(parts, "2. Follow the plan step by step to implement the spec\n")
+	parts = append(parts, "3. Write tests first (TDD), implement, verify, and commit\n")
 
 	if pipeState != nil {
 		parts = append(parts, "## Pipeline State\n")

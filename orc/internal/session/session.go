@@ -17,7 +17,7 @@ type Result struct {
 	Stderr     string
 }
 
-func Run(promptName, prompt string, timeout time.Duration) (*Result, error) {
+func Run(promptName, prompt, workDir string, timeout time.Duration) (*Result, error) {
 	path, err := exec.LookPath("opencode")
 	if err != nil {
 		return nil, fmt.Errorf("opencode not found on $PATH: install via 'pip install opencode' or download from https://opencode.ai")
@@ -26,6 +26,7 @@ func Run(promptName, prompt string, timeout time.Duration) (*Result, error) {
 	fmt.Fprintf(os.Stderr, "\n=== prompt[%s] (%d bytes) ===\n%s\n=== end prompt[%s] ===\n", promptName, len(prompt), prompt, promptName)
 
 	cmd := execCommand(path, "run", "--dangerously-skip-permissions", prompt)
+	cmd.Dir = workDir
 	cmd.Stdin = os.Stdin
 
 	var stdout, stderr strings.Builder
