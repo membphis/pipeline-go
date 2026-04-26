@@ -1,100 +1,103 @@
-# Orc — AI Project Pipeline Orchestrator
+# orc
 
-AI 项目流水线编排器，将复杂项目分解为多个里程碑（Milestone），
-在当前分支上依次调用 AI 编码会话，执行验证命令，进行阶段审查。
+一个命令行工具，按 milestone 顺序在同一个 git 分支上执行 AI 编码任务。
 
-> **核心原则：不创建 git 分支。** 所有 milestone 直接在当前分支执行。
+你写一个 `project.yaml` 描述要做什么，它逐个 milestone 调用 opencode 去实现，并在每个 milestone 完成后跑你指定的验证命令。断点续传——中途挂了重新跑会自动跳过已完成 spec。
 
-## Quick Start
+不切分支，所有工作都在当前分支上完成。
+
+## 安装
 
 ```bash
-# Build
 cd orc && go build -o orc .
-
-# Run
-orc -s ./sample-project/project.yaml
 ```
 
-## Usage
+## 5 分钟体验
 
-Write a `project.yaml`:
+`sample-project/project.yaml` 定义了一个简单的计算器：
+
+```bash
+# -s 指定任务文件，--root 指定工作目录
+orc -s sample-project/project.yaml --root /tmp/my-calc
+```
+
+`--root` 可以是一个空目录（orc 会自动 `git init` 和 `git commit --allow-empty`），也可以是一个已有仓库。
+
+## 怎么写 project.yaml
 
 ```yaml
 project:
   name: my-project
 
 milestones:
-  - id: m1-setup
-    name: Project Setup
+  - id: setup
+    name: 项目初始化
     specs:
       - id: s1
-        description: Initialize project structure
-        task_count: 2
-        est_minutes: 10
-        spec_file: design/setup.md
+        description: 创建项目结构
+        spec_file: design/setup.md    # 需求文档路径，相对于 orc 启动目录
+        task_count: 3                  # 预估任务数
     verify:
       - go build ./...
+      - go test ./...
+
+  - id: core
+    name: 核心功能
+    depends_on: [setup]                # 等 setup 做完才轮到这个
+    specs:
+      - id: c1
+        description: 实现核心逻辑
+        spec_file: design/core.md
+        task_count: 5
+        test_count: 3                  # >0 时强制走 TDD 流程
+    verify: make check                 # 单条命令可以不写列表
 ```
 
-Run:
+### 字段速查
+
+| 字段 | 必填 | 说明 |
+|------|------|------|
+| `project.name` | 是 | 项目名 |
+| `milestones[].id` | 是 | 唯一标识，`depends_on` 引用这个 |
+| `milestones[].name` | 是 | 显示名，写给人看 |
+| `milestones[].depends_on` | 否 | 依赖的 milestone id 列表 |
+| `milestones[].specs[].spec_file` | 否 | 需求文档路径 |
+| `milestones[].specs[].task_count` | 否 | 任务数量估计 |
+| `milestones[].specs[].test_count` | 否 | 需要几个测试，填了就强制 TDD |
+| `milestones[].verify` | 否 | 验证命令，string 或 string 数组，exit 0 算过 |
+
+## 常用命令
 
 ```bash
-# Basic (default: project.yaml)
-orc
+# 基本用法
+orc -s project.yaml --root ./my-project
 
-# Custom spec
-orc --spec path/to/project.yaml
+# 指定 AI 模型（plan 阶段用推理模型，实现阶段用快的）
+orc -s project.yaml --root . --plan-model anthropic/claude-opus-4-5 --exec-model openai/gpt-5.1-codex
 
-# Shorthand
-orc -s path/to/project.yaml
-
-# Custom root
-orc --root /path/to/project
-
-# Combine multiple spec files
-orc --spec base.yaml --extra-spec features.yaml
 ```
 
-## Requirements
+如果重新执行时有些 milestone 已经完成了（记录在 `state.yaml` 里），它们会被自动跳过。想重来就删掉 `state.yaml`。
+
+## 每个 milestone 内部做了什么
+
+一个 milestone 会依次跑两轮 opencode：
+
+1. **Plan** — 读需求文档，产出 `.orc_history/PLAN.md`（用 `--plan-model`）
+2. **Exec** — 读 PLAN.md，写代码、跑测试、做 code review，最后 `git commit`（用 `--exec-model`）
+
+Exec 结束后，orc 会执行 `verify` 里定义的命令，收集 `HANDOFF*.md`，然后对该 milestone 做一次审查。
+
+## 环境要求
 
 - Go 1.23+
-- Git
-- [opencode](https://opencode.ai) (on `$PATH`)
+- `git`
+- `opencode` 命令在 $PATH 中，参见 [opencode.ai](https://opencode.ai)
 
-## Development
+## 开发
 
 ```bash
 cd orc
 go test ./... -v
 go build -o orc .
 ```
-
-## Project Structure
-
-```
-orc/
-├── main.go                    # CLI 入口
-├── internal/
-│   ├── pipeline/              # Pipeline 核心编排
-│   ├── spec/                  # YAML 加载和校验
-│   ├── state/                 # 状态持久化
-│   ├── topo/                  # 拓扑排序
-│   ├── git/                   # Git 操作（仅打标签）
-│   ├── session/               # opencode 子进程管理
-│   ├── handoff/               # HANDOFF.md 收集
-│   ├── verify/                # 验证命令执行
-│   ├── review/                # 阶段/最终审查
-│   ├── context/               # Token 预算管理
-│   └── log/                   # 日志配置
-├── go.mod
-└── sample-project/
-```
-
-## How It Works
-
-1. **Load YAML** — 解析 project.yaml
-2. **Preflight** — 校验格式和依赖完整性
-3. **Topo Sort** — 根据 depends_on 计算执行顺序
-4. **Per Milestone** — 运行 opencode → 验证 → 收集 HANDOFF.md → 阶段审查
-5. **Final Review** — 全部完成后最终审查
-6. **Tag** — 成功完成后打 `{name}-v1.0` 标签
