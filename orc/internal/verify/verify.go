@@ -18,12 +18,12 @@ func (r *Result) Success() bool {
 
 var execCommand = exec.Command
 
-func Run(spec interface{}, timeout time.Duration) ([]Result, error) {
+func Run(spec interface{}, timeout time.Duration, workDir string) ([]Result, error) {
 	switch v := spec.(type) {
 	case nil:
 		return nil, nil
 	case string:
-		r, err := runOne(v, timeout)
+		r, err := runOne(v, timeout, workDir)
 		if err != nil {
 			return nil, err
 		}
@@ -31,7 +31,7 @@ func Run(spec interface{}, timeout time.Duration) ([]Result, error) {
 	case []string:
 		var results []Result
 		for _, cmd := range v {
-			r, err := runOne(cmd, timeout)
+			r, err := runOne(cmd, timeout, workDir)
 			if err != nil {
 				return nil, err
 			}
@@ -45,7 +45,7 @@ func Run(spec interface{}, timeout time.Duration) ([]Result, error) {
 			if !ok {
 				continue
 			}
-			r, err := runOne(s, timeout)
+			r, err := runOne(s, timeout, workDir)
 			if err != nil {
 				return nil, err
 			}
@@ -57,8 +57,9 @@ func Run(spec interface{}, timeout time.Duration) ([]Result, error) {
 	}
 }
 
-func runOne(cmdStr string, timeout time.Duration) (*Result, error) {
+func runOne(cmdStr string, timeout time.Duration, workDir string) (*Result, error) {
 	cmd := execCommand("sh", "-c", cmdStr)
+	cmd.Dir = workDir
 	var stdout, stderr strings.Builder
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

@@ -5,7 +5,7 @@ import (
 )
 
 func TestRunString(t *testing.T) {
-	results, err := Run("echo ok", 0)
+	results, err := Run("echo ok", 0, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -21,7 +21,7 @@ func TestRunString(t *testing.T) {
 }
 
 func TestRunList(t *testing.T) {
-	results, err := Run([]string{"echo a", "echo b"}, 0)
+	results, err := Run([]string{"echo a", "echo b"}, 0, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +36,7 @@ func TestRunList(t *testing.T) {
 }
 
 func TestRunNil(t *testing.T) {
-	results, err := Run(nil, 0)
+	results, err := Run(nil, 0, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func TestRunNil(t *testing.T) {
 }
 
 func TestRunFailure(t *testing.T) {
-	results, err := Run("false", 0)
+	results, err := Run("false", 0, "")
 	if err != nil {
 		t.Fatal(err)
 	}
