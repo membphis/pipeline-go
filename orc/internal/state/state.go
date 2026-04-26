@@ -26,8 +26,8 @@ func (s Status) Valid() bool {
 }
 
 type MilestoneInfo struct {
-	Status    Status   `yaml:"status"`
-	Timestamp *float64 `yaml:"timestamp,omitempty"`
+	Status    Status     `yaml:"status"`
+	Timestamp *time.Time `yaml:"timestamp,omitempty"`
 }
 
 type State struct {
@@ -78,7 +78,7 @@ func (s *State) Set(milestone string, status Status) error {
 	if _, ok := s.Milestones[milestone]; !ok {
 		return fmt.Errorf("unknown milestone: %s", milestone)
 	}
-	now := float64(time.Now().Unix())
+	now := time.Now()
 	s.Milestones[milestone] = MilestoneInfo{
 		Status:    status,
 		Timestamp: &now,

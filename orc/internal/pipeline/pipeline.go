@@ -3,7 +3,6 @@ package pipeline
 import (
 	"fmt"
 	"log/slog"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -101,15 +100,19 @@ func (p *Pipeline) Run() int {
 				rc = result.ReturnCode
 			}
 			p.logger.Warn("session failed", "name", msID, "code", rc, "error", err)
-		} else {
-			pipeState.Set(msID, state.StatusCompleted)
+			pipeState.Save()
+			continue
 		}
+		pipeState.Set(msID, state.StatusCompleted)
 		pipeState.Save()
 
 		if ms.Verify != nil {
 			vResults, err := verify.Run(ms.Verify, 0)
 			if err == nil {
 				allVerifyResults = append(allVerifyResults, vResults...)
+				if !verify.AllSuccessful(vResults) {
+					p.logger.Warn("some verify commands failed", "name", msID)
+				}
 			}
 		}
 
@@ -149,6 +152,11 @@ func computeMilestoneSpec(ms *spec.Milestone, all []spec.Milestone, pipeState *s
 
 	parts = append(parts, fmt.Sprintf("# Milestone: %s\n", ms.Name))
 
+	parts = append(parts, "## Git Rules\n")
+	parts = append(parts, "CRITICAL: Do NOT create, switch, or merge git branches. Do NOT make git commits.\n")
+	parts = append(parts, "All work must be done on the CURRENT branch without any git write operations.\n")
+	parts = append(parts, "You may use `git status`, `git diff`, `git log` for reading state only.\n\n")
+
 	if len(ms.Specs) > 0 {
 		parts = append(parts, "## Specs\n")
 		for _, s := range ms.Specs {
@@ -158,29 +166,18 @@ func computeMilestoneSpec(ms *spec.Milestone, all []spec.Milestone, pipeState *s
 				parts = append(parts, fmt.Sprintf("- Tests: %d\n", s.TestCount))
 			}
 			if s.SpecFile != "" {
-				specPath := filepath.Join(rootDir, s.SpecFile)
-				data, err := os.ReadFile(specPath)
-				if err == nil {
-					parts = append(parts, "\n"+string(data)+"\n")
-				}
+				parts = append(parts, fmt.Sprintf("- Spec file: %s\n", s.SpecFile))
 			}
 		}
 	}
 
-	if hasTests(ms.Specs) {
-		parts = append(parts, "## Development Process\n")
-		parts = append(parts, "Follow Test-Driven Development (TDD):\n")
-		parts = append(parts, "1. Write failing tests first\n")
-		parts = append(parts, "2. Verify they fail correctly\n")
-		parts = append(parts, "3. Write minimal implementation to pass\n")
-		parts = append(parts, "4. Verify all tests pass\n")
-		parts = append(parts, "5. Refactor while keeping tests green\n\n")
-		for _, s := range ms.Specs {
-			if s.TestCount > 0 {
-				parts = append(parts, fmt.Sprintf("For %s: generate %d test cases before implementation.\n", s.ID, s.TestCount))
-			}
-		}
-	}
+	parts = append(parts, "## Development Process\n")
+	parts = append(parts, "Follow Test-Driven Development (TDD):\n")
+	parts = append(parts, "1. Write tests first (decide how many based on the actual changes needed)\n")
+	parts = append(parts, "2. Verify they fail correctly\n")
+	parts = append(parts, "3. Write minimal implementation to pass\n")
+	parts = append(parts, "4. Verify all tests pass\n")
+	parts = append(parts, "5. Refactor while keeping tests green\n")
 
 	if pipeState != nil {
 		parts = append(parts, "## Pipeline State\n")
@@ -229,28 +226,10 @@ func buildSpecContent(ms *spec.Milestone, rootDir string) string {
 			parts = append(parts, fmt.Sprintf("- Tests: %d\n", s.TestCount))
 		}
 		if s.SpecFile != "" {
-			specPath := filepath.Join(rootDir, s.SpecFile)
-			data, err := os.ReadFile(specPath)
-			if err == nil {
-				parts = append(parts, "\n"+string(data)+"\n")
-			}
+			parts = append(parts, fmt.Sprintf("- Spec file: %s\n", s.SpecFile))
 		}
 	}
 	return strings.TrimSpace(strings.Join(parts, "\n"))
 }
 
-func hasTests(specs []spec.SpecItem) bool {
-	for _, s := range specs {
-		if s.TestCount > 0 {
-			return true
-		}
-	}
-	return false
-}
 
-func truncate(s string, max int) string {
-	if len(s) <= max {
-		return s
-	}
-	return s[:max] + "..."
-}

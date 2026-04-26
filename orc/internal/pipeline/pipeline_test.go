@@ -22,7 +22,7 @@ func TestComputeMilestoneSpec(t *testing.T) {
 	if !strings.Contains(result, "test spec") {
 		t.Fatal("missing spec description")
 	}
-	if !strings.Contains(result, "generate 2 test cases") {
+	if !strings.Contains(result, "Write tests first") {
 		t.Fatal("missing TDD instruction")
 	}
 }
