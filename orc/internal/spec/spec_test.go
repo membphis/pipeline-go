@@ -9,10 +9,10 @@ func TestLoadSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Project.Name != "simple-http-proxy" {
+	if s.Project.Name != "simple-calc-server" {
 		t.Fatalf("unexpected project name: %s", s.Project.Name)
 	}
-	if len(s.Milestones) != 4 {
+	if len(s.Milestones) != 3 {
 		t.Fatalf("expected 4 milestones, got %d", len(s.Milestones))
 	}
 }
