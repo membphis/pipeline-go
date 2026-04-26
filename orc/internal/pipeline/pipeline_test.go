@@ -16,17 +16,17 @@ func TestDetectDefaultBranch(t *testing.T) {
 
 func TestComputeMilestoneSpec(t *testing.T) {
 	ms := &spec.Milestone{
-		Name: "m1",
-		Spec: "test spec",
-		Tasks: []spec.TaskSpec{
-			{Name: "t1"},
+		ID:   "m1",
+		Name: "Milestone One",
+		Specs: []spec.SpecItem{
+			{ID: "s1", Description: "test spec", TaskCount: 2, EstMinutes: 15},
 		},
 	}
-	result := computeMilestoneSpec(ms, nil, nil, nil)
-	if !strings.Contains(result, "m1") {
+	result := computeMilestoneSpec(ms, nil, nil, nil, ".")
+	if !strings.Contains(result, "Milestone One") {
 		t.Fatal("missing milestone name")
 	}
-	if !strings.Contains(result, "t1") {
-		t.Fatal("missing task name")
+	if !strings.Contains(result, "test spec") {
+		t.Fatal("missing spec description")
 	}
 }

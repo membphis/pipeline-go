@@ -15,7 +15,7 @@ func TestEmptyMilestones(t *testing.T) {
 }
 
 func TestSingleMilestone(t *testing.T) {
-	result, err := Sort([]Milestone{{Name: "m1"}})
+	result, err := Sort([]Milestone{{ID: "m1"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,9 +26,9 @@ func TestSingleMilestone(t *testing.T) {
 
 func TestSimpleChain(t *testing.T) {
 	ms := []Milestone{
-		{Name: "m1"},
-		{Name: "m2", DependsOn: []string{"m1"}},
-		{Name: "m3", DependsOn: []string{"m2"}},
+		{ID: "m1"},
+		{ID: "m2", DependsOn: []string{"m1"}},
+		{ID: "m3", DependsOn: []string{"m2"}},
 	}
 	result, err := Sort(ms)
 	if err != nil {
@@ -45,8 +45,8 @@ func TestSimpleChain(t *testing.T) {
 
 func TestCycleDetection(t *testing.T) {
 	ms := []Milestone{
-		{Name: "m1", DependsOn: []string{"m2"}},
-		{Name: "m2", DependsOn: []string{"m1"}},
+		{ID: "m1", DependsOn: []string{"m2"}},
+		{ID: "m2", DependsOn: []string{"m1"}},
 	}
 	_, err := Sort(ms)
 	if err == nil {
@@ -60,7 +60,7 @@ func TestCycleDetection(t *testing.T) {
 
 func TestSelfCycle(t *testing.T) {
 	ms := []Milestone{
-		{Name: "m1", DependsOn: []string{"m1"}},
+		{ID: "m1", DependsOn: []string{"m1"}},
 	}
 	_, err := Sort(ms)
 	if err == nil {
@@ -70,10 +70,10 @@ func TestSelfCycle(t *testing.T) {
 
 func TestDiamond(t *testing.T) {
 	ms := []Milestone{
-		{Name: "m1"},
-		{Name: "m2", DependsOn: []string{"m1"}},
-		{Name: "m3", DependsOn: []string{"m1"}},
-		{Name: "m4", DependsOn: []string{"m2", "m3"}},
+		{ID: "m1"},
+		{ID: "m2", DependsOn: []string{"m1"}},
+		{ID: "m3", DependsOn: []string{"m1"}},
+		{ID: "m4", DependsOn: []string{"m2", "m3"}},
 	}
 	result, err := Sort(ms)
 	if err != nil {

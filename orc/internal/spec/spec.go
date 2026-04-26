@@ -12,15 +12,20 @@ type Project struct {
 	Description string `yaml:"description,omitempty"`
 }
 
-type TaskSpec struct {
-	Name string `yaml:"name"`
+type SpecItem struct {
+	ID          string `yaml:"id"`
+	Description string `yaml:"description"`
+	SpecFile    string `yaml:"spec_file"`
+	TaskCount   int    `yaml:"task_count"`
+	EstMinutes  int    `yaml:"est_minutes"`
 }
 
 type Milestone struct {
+	ID        string     `yaml:"id"`
 	Name      string     `yaml:"name"`
-	Spec      string     `yaml:"spec,omitempty"`
+	Order     int        `yaml:"order,omitempty"`
 	DependsOn []string   `yaml:"depends_on,omitempty"`
-	Tasks     []TaskSpec `yaml:"tasks"`
+	Specs     []SpecItem `yaml:"specs"`
 	Verify    []string   `yaml:"verify,omitempty"`
 }
 
@@ -56,9 +61,9 @@ func Load(path string, extraSpecs ...string) (*Spec, error) {
 	return &spec, nil
 }
 
-func GetMilestone(s *Spec, name string) *Milestone {
+func GetMilestone(s *Spec, id string) *Milestone {
 	for i := range s.Milestones {
-		if s.Milestones[i].Name == name {
+		if s.Milestones[i].ID == id {
 			return &s.Milestones[i]
 		}
 	}
@@ -67,24 +72,24 @@ func GetMilestone(s *Spec, name string) *Milestone {
 
 func Preflight(s *Spec) []string {
 	var errors []string
-	names := make(map[string]bool)
+	ids := make(map[string]bool)
 	for _, ms := range s.Milestones {
-		if ms.Name == "" {
-			errors = append(errors, "milestone without name")
+		if ms.ID == "" {
+			errors = append(errors, "milestone without id")
 			continue
 		}
-		if names[ms.Name] {
-			errors = append(errors, fmt.Sprintf("duplicate milestone name: %s", ms.Name))
+		if ids[ms.ID] {
+			errors = append(errors, fmt.Sprintf("duplicate milestone id: %s", ms.ID))
 		}
-		names[ms.Name] = true
-		if len(ms.Tasks) == 0 {
-			errors = append(errors, fmt.Sprintf("milestone %q has no tasks", ms.Name))
+		ids[ms.ID] = true
+		if len(ms.Specs) == 0 {
+			errors = append(errors, fmt.Sprintf("milestone %q has no specs", ms.ID))
 		}
 	}
 	for _, ms := range s.Milestones {
 		for _, dep := range ms.DependsOn {
-			if !names[dep] {
-				errors = append(errors, fmt.Sprintf("milestone %q has unknown dependency: %q", ms.Name, dep))
+			if !ids[dep] {
+				errors = append(errors, fmt.Sprintf("milestone %q has unknown dependency: %q", ms.ID, dep))
 			}
 		}
 	}

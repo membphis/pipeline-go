@@ -33,11 +33,14 @@ func TestGetMilestone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ms := GetMilestone(s, "M1-http-listener")
+	ms := GetMilestone(s, "m1-http-listener")
 	if ms == nil {
 		t.Fatal("expected milestone")
 	}
-	if ms.Name != "M1-http-listener" {
+	if ms.ID != "m1-http-listener" {
+		t.Fatalf("unexpected id: %s", ms.ID)
+	}
+	if ms.Name != "HTTP Listener" {
 		t.Fatalf("unexpected name: %s", ms.Name)
 	}
 }
@@ -56,8 +59,8 @@ func TestPreflightDuplicate(t *testing.T) {
 	s := &Spec{
 		Project: Project{Name: "test"},
 		Milestones: []Milestone{
-			{Name: "m1", Tasks: []TaskSpec{{Name: "t1"}}},
-			{Name: "m1", Tasks: []TaskSpec{{Name: "t2"}}},
+			{ID: "m1", Specs: []SpecItem{{ID: "s1"}}},
+			{ID: "m1", Specs: []SpecItem{{ID: "s2"}}},
 		},
 	}
 	errs := Preflight(s)
@@ -70,7 +73,7 @@ func TestPreflightMissingDep(t *testing.T) {
 	s := &Spec{
 		Project: Project{Name: "test"},
 		Milestones: []Milestone{
-			{Name: "m1", DependsOn: []string{"nonexistent"}, Tasks: []TaskSpec{{Name: "t1"}}},
+			{ID: "m1", DependsOn: []string{"nonexistent"}, Specs: []SpecItem{{ID: "s1"}}},
 		},
 	}
 	errs := Preflight(s)
@@ -79,14 +82,14 @@ func TestPreflightMissingDep(t *testing.T) {
 	}
 }
 
-func TestPreflightEmptyTasks(t *testing.T) {
+func TestPreflightEmptySpecs(t *testing.T) {
 	s := &Spec{
 		Project:    Project{Name: "test"},
-		Milestones: []Milestone{{Name: "m1"}},
+		Milestones: []Milestone{{ID: "m1"}},
 	}
 	errs := Preflight(s)
 	if len(errs) == 0 {
-		t.Fatal("expected empty tasks error")
+		t.Fatal("expected empty specs error")
 	}
 }
 

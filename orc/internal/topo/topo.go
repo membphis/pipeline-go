@@ -11,17 +11,17 @@ func (e *CycleError) Error() string {
 }
 
 type Milestone struct {
-	Name      string
+	ID        string
 	DependsOn []string
 }
 
 func Sort(milestones []Milestone) ([]string, error) {
 	graph := make(map[string][]string)
-	allNames := make(map[string]bool)
+	allIDs := make(map[string]bool)
 
 	for _, ms := range milestones {
-		allNames[ms.Name] = true
-		graph[ms.Name] = ms.DependsOn
+		allIDs[ms.ID] = true
+		graph[ms.ID] = ms.DependsOn
 	}
 
 	visited := make(map[string]bool)
@@ -45,7 +45,7 @@ func Sort(milestones []Milestone) ([]string, error) {
 		}
 		inProgress[node] = true
 		for _, dep := range graph[node] {
-			if allNames[dep] {
+			if allIDs[dep] {
 				if err := visit(dep); err != nil {
 					return err
 				}
@@ -58,8 +58,8 @@ func Sort(milestones []Milestone) ([]string, error) {
 	}
 
 	for _, ms := range milestones {
-		if !visited[ms.Name] {
-			if err := visit(ms.Name); err != nil {
+		if !visited[ms.ID] {
+			if err := visit(ms.ID); err != nil {
 				return nil, err
 			}
 		}

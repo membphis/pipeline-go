@@ -3,6 +3,7 @@ package pipeline
 import (
 	"fmt"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -59,10 +60,10 @@ func (p *Pipeline) Run() int {
 	}
 
 	topoMilestones := make([]topo.Milestone, len(projectSpec.Milestones))
-	names := make([]string, len(projectSpec.Milestones))
+	ids := make([]string, len(projectSpec.Milestones))
 	for i, ms := range projectSpec.Milestones {
-		topoMilestones[i] = topo.Milestone{Name: ms.Name, DependsOn: ms.DependsOn}
-		names[i] = ms.Name
+		topoMilestones[i] = topo.Milestone{ID: ms.ID, DependsOn: ms.DependsOn}
+		ids[i] = ms.ID
 	}
 
 	ordered, err := topo.Sort(topoMilestones)
@@ -72,7 +73,7 @@ func (p *Pipeline) Run() int {
 	}
 	p.logger.Info("milestone order", "order", fmt.Sprintf("%v", ordered))
 
-	pipeState := state.New(names, filepath.Join(p.Config.Root, "state.yaml"))
+	pipeState := state.New(ids, filepath.Join(p.Config.Root, "state.yaml"))
 	defaultBranch := detectDefaultBranch()
 
 	seenHandoffPaths := make(map[string]bool)
@@ -80,13 +81,13 @@ func (p *Pipeline) Run() int {
 	var allVerifyResults []verify.Result
 	hasFailures := false
 
-	for _, msName := range ordered {
-		ms := spec.GetMilestone(projectSpec, msName)
+	for _, msID := range ordered {
+		ms := spec.GetMilestone(projectSpec, msID)
 		if ms == nil {
 			continue
 		}
 
-		pipeState.Set(msName, state.StatusInProgress)
+		pipeState.Set(msID, state.StatusInProgress)
 		pipeState.Save()
 
 		var branchName string
@@ -96,7 +97,7 @@ func (p *Pipeline) Run() int {
 				p.logger.Warn("working tree not clean")
 			}
 		} else {
-			branchName = msName + "-pipeline"
+			branchName = msID + "-pipeline"
 			if err := git.Checkout(defaultBranch); err != nil {
 				p.logger.Error("checkout failed", "branch", defaultBranch, "error", err)
 				return 1
@@ -107,24 +108,24 @@ func (p *Pipeline) Run() int {
 			}
 		}
 
-		p.logger.Info("starting milestone", "name", msName, "branch", branchName)
-		prompt := computeMilestoneSpec(ms, projectSpec.Milestones, pipeState, allHandoffNotes)
-		p.logger.Info("running milestone", "name", msName, "prompt_bytes", len(prompt))
+		p.logger.Info("starting milestone", "name", msID, "branch", branchName)
+		prompt := computeMilestoneSpec(ms, projectSpec.Milestones, pipeState, allHandoffNotes, p.Config.Root)
+		p.logger.Info("running milestone", "name", msID, "prompt_bytes", len(prompt))
 		fmt.Println("========= PROMPT =========")
 		fmt.Println(prompt)
 		fmt.Println("==========================")
 
 		result, err := session.Run(prompt, 0)
 		if err != nil || result.ReturnCode != 0 {
-			pipeState.Set(msName, state.StatusFailed)
+			pipeState.Set(msID, state.StatusFailed)
 			hasFailures = true
 			rc := -1
 			if result != nil {
 				rc = result.ReturnCode
 			}
-			p.logger.Warn("session failed", "name", msName, "code", rc, "error", err)
+			p.logger.Warn("session failed", "name", msID, "code", rc, "error", err)
 		} else {
-			pipeState.Set(msName, state.StatusCompleted)
+			pipeState.Set(msID, state.StatusCompleted)
 		}
 		pipeState.Save()
 
@@ -145,18 +146,18 @@ func (p *Pipeline) Run() int {
 		}
 		allHandoffNotes = append(allHandoffNotes, deduped...)
 
-		review.Phase(msName, ms.Spec, deduped, allVerifyResults)
+		review.Phase(msID, buildSpecContent(ms, p.Config.Root), deduped, allVerifyResults)
 
 		if p.Config.Branch == "" {
 			if err := git.AddAll(); err != nil {
 				p.logger.Error("git add failed", "error", err)
 				return 1
 			}
-			if err := git.Commit("Milestone " + msName); err != nil {
+			if err := git.Commit("Milestone " + msID); err != nil {
 				p.logger.Error("commit failed", "error", err)
 				return 1
 			}
-			if err := git.Tag(msName + "-done"); err != nil {
+			if err := git.Tag(msID + "-done"); err != nil {
 				p.logger.Warn("tag failed", "error", err)
 			}
 			if err := git.Checkout(defaultBranch); err != nil {
@@ -171,7 +172,7 @@ func (p *Pipeline) Run() int {
 
 	var msInfos []context.MilestoneInfo
 	for _, ms := range projectSpec.Milestones {
-		msInfos = append(msInfos, context.MilestoneInfo{Name: ms.Name, Spec: ms.Spec})
+		msInfos = append(msInfos, context.MilestoneInfo{Name: ms.Name, Spec: buildSpecContent(&ms, p.Config.Root)})
 	}
 	review.Final(projectSpec.Project.Name, msInfos, allHandoffNotes, allVerifyResults)
 
@@ -199,20 +200,24 @@ func detectDefaultBranch() string {
 	return "main"
 }
 
-func computeMilestoneSpec(ms *spec.Milestone, all []spec.Milestone, pipeState *state.State, handoffNotes []handoff.Note) string {
+func computeMilestoneSpec(ms *spec.Milestone, all []spec.Milestone, pipeState *state.State, handoffNotes []handoff.Note, rootDir string) string {
 	var parts []string
 
 	parts = append(parts, fmt.Sprintf("# Milestone: %s\n", ms.Name))
-	if ms.Spec != "" {
-		parts = append(parts, "## Spec\n\n"+ms.Spec+"\n")
-	}
 
-	if len(ms.Tasks) > 0 {
-		parts = append(parts, "## Tasks\n")
-		for _, t := range ms.Tasks {
-			parts = append(parts, fmt.Sprintf("- %s\n", t.Name))
+	if len(ms.Specs) > 0 {
+		parts = append(parts, "## Specs\n")
+		for _, s := range ms.Specs {
+			parts = append(parts, fmt.Sprintf("### %s: %s\n", s.ID, s.Description))
+			parts = append(parts, fmt.Sprintf("- Tasks: %d | Est: %d min\n", s.TaskCount, s.EstMinutes))
+			if s.SpecFile != "" {
+				specPath := filepath.Join(rootDir, s.SpecFile)
+				data, err := os.ReadFile(specPath)
+				if err == nil {
+					parts = append(parts, "\n"+string(data)+"\n")
+				}
+			}
 		}
-		parts = append(parts, "\n")
 	}
 
 	if pipeState != nil {
@@ -231,21 +236,41 @@ func computeMilestoneSpec(ms *spec.Milestone, all []spec.Milestone, pipeState *s
 
 	var remaining []spec.Milestone
 	for _, m := range all {
-		if m.Name != ms.Name {
+		if m.ID != ms.ID {
 			remaining = append(remaining, m)
 		}
 	}
 	if len(remaining) > 0 {
 		parts = append(parts, "## Upcoming Milestones\n")
 		for _, m := range remaining {
-			specPreview := m.Spec
-			if len([]rune(specPreview)) > 80 {
-				specPreview = string([]rune(specPreview)[:80])
+			var descParts []string
+			for _, s := range m.Specs {
+				descParts = append(descParts, s.Description)
 			}
-			parts = append(parts, fmt.Sprintf("- %s: %s...\n", m.Name, specPreview))
+			preview := strings.Join(descParts, "; ")
+			if len([]rune(preview)) > 80 {
+				preview = string([]rune(preview)[:80])
+			}
+			parts = append(parts, fmt.Sprintf("- %s: %s...\n", m.Name, preview))
 		}
 	}
 
+	return strings.TrimSpace(strings.Join(parts, "\n"))
+}
+
+func buildSpecContent(ms *spec.Milestone, rootDir string) string {
+	var parts []string
+	for _, s := range ms.Specs {
+		parts = append(parts, fmt.Sprintf("### %s: %s\n", s.ID, s.Description))
+		parts = append(parts, fmt.Sprintf("- Tasks: %d | Est: %d min\n", s.TaskCount, s.EstMinutes))
+		if s.SpecFile != "" {
+			specPath := filepath.Join(rootDir, s.SpecFile)
+			data, err := os.ReadFile(specPath)
+			if err == nil {
+				parts = append(parts, "\n"+string(data)+"\n")
+			}
+		}
+	}
 	return strings.TrimSpace(strings.Join(parts, "\n"))
 }
 
