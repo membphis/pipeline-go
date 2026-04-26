@@ -15,7 +15,7 @@ func TestComputeMilestoneSpec(t *testing.T) {
 			{ID: "s1", Description: "test spec", TaskCount: 2, TestCount: 2, EstMinutes: 15, SpecFile: "specs/m1.md"},
 		},
 	}
-	result := computeMilestoneSpec(ms, nil, nil, nil, ".")
+	result := computeMilestoneSpec(ms, nil, nil, nil, ".", ".")
 	if !strings.Contains(result, "Milestone One") {
 		t.Fatal("missing milestone name")
 	}
