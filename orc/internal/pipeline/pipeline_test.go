@@ -19,7 +19,7 @@ func TestBuildExecPrompt(t *testing.T) {
 			{ID: "s1", Description: "test spec", TaskCount: 2, TestCount: 2, EstMinutes: 15, SpecFile: "specs/m1.md"},
 		},
 	}
-	result := buildExecPrompt(ms, nil, nil, nil, ".")
+	result := buildExecPrompt(ms, nil, nil, nil, ".", ".")
 	if !strings.Contains(result, "Milestone One") {
 		t.Fatal("missing milestone name")
 	}
@@ -45,7 +45,7 @@ func TestBuildPlanPrompt(t *testing.T) {
 			{ID: "s1", Description: "test spec", TaskCount: 2, TestCount: 2, EstMinutes: 15, SpecFile: "specs/m1.md"},
 		},
 	}
-	result := buildPlanPrompt(ms, ".")
+	result := buildPlanPrompt(ms, ".", ".")
 	if !strings.Contains(result, "Milestone One") {
 		t.Fatal("missing milestone name")
 	}

@@ -134,7 +134,7 @@ func (p *Pipeline) Run() int {
 
 		// Phase 1: Plan session
 		p.logger.Info("starting plan session", "name", msID)
-		planPrompt := buildPlanPrompt(ms, cwd)
+		planPrompt := buildPlanPrompt(ms, cwd, root)
 		p.logger.Info("running plan session", "name", msID, "prompt_bytes", len(planPrompt), "model", p.Config.PlanModel)
 		planResult, planErr := session.Run(msID+"-plan", planPrompt, root, 0, p.Config.PlanModel)
 		if planErr != nil || planResult.ReturnCode != 0 {
@@ -156,7 +156,7 @@ func (p *Pipeline) Run() int {
 
 		// Phase 2-5: Exec session
 		p.logger.Info("starting exec session", "name", msID)
-		execPrompt := buildExecPrompt(ms, projectSpec.Milestones, pipeState, allHandoffNotes, cwd)
+		execPrompt := buildExecPrompt(ms, projectSpec.Milestones, pipeState, allHandoffNotes, cwd, root)
 		p.logger.Info("running exec session", "name", msID, "prompt_bytes", len(execPrompt), "model", p.Config.ExecModel)
 		execResult, execErr := session.Run(msID+"-exec", execPrompt, root, 0, p.Config.ExecModel)
 		if execErr != nil || execResult.ReturnCode != 0 {
@@ -282,7 +282,7 @@ func (p *Pipeline) ensureRoot(pipeState *state.State) error {
 	return nil
 }
 
-func buildPlanPrompt(ms *spec.Milestone, cwd string) string {
+func buildPlanPrompt(ms *spec.Milestone, cwd string, root string) string {
 	var parts []string
 	parts = append(parts, fmt.Sprintf("# Milestone: %s\n", ms.Name))
 	parts = append(parts, "## Git Rules\n")
@@ -303,12 +303,12 @@ func buildPlanPrompt(ms *spec.Milestone, cwd string) string {
 
 	parts = append(parts, "## Plan Phase\n")
 	parts = append(parts, "1. Load the `writing-plans` skill and create a detailed implementation plan\n")
-	parts = append(parts, "2. Write the plan to `.orc_history/PLAN.md`\n")
+	parts = append(parts, fmt.Sprintf("2. Write the plan to `%s/.orc_history/PLAN.md`\n", root))
 	parts = append(parts, "3. When writing-plans asks \"Execution Handoff\", choose \"Write Only\" — do NOT execute\n")
 	return strings.TrimSpace(strings.Join(parts, "\n"))
 }
 
-func buildExecPrompt(ms *spec.Milestone, all []spec.Milestone, pipeState *state.State, handoffNotes []handoff.Note, cwd string) string {
+func buildExecPrompt(ms *spec.Milestone, all []spec.Milestone, pipeState *state.State, handoffNotes []handoff.Note, cwd string, root string) string {
 	var parts []string
 
 	parts = append(parts, fmt.Sprintf("# Milestone: %s\n", ms.Name))
@@ -330,7 +330,7 @@ func buildExecPrompt(ms *spec.Milestone, all []spec.Milestone, pipeState *state.
 	}
 
 	parts = append(parts, "## Plan\n")
-	parts = append(parts, "Read `.orc_history/PLAN.md` for the implementation plan.\n\n")
+	parts = append(parts, fmt.Sprintf("Read `%s/.orc_history/PLAN.md` for the implementation plan.\n\n", root))
 
 	parts = append(parts, "## Development Process\n")
 	parts = append(parts, "### Phase 2: Execute\n")
