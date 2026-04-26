@@ -65,10 +65,8 @@ func TestFormatNotes(t *testing.T) {
 func TestCollectMultiple(t *testing.T) {
 	dir, _ := os.MkdirTemp("", "handoff-*")
 	defer os.RemoveAll(dir)
-	os.MkdirAll(filepath.Join(dir, "sub1"), 0755)
-	os.MkdirAll(filepath.Join(dir, "sub2"), 0755)
-	os.WriteFile(filepath.Join(dir, "sub1", "HANDOFF.md"), []byte("Note 1"), 0644)
-	os.WriteFile(filepath.Join(dir, "sub2", "HANDOFF.md"), []byte("Note 2"), 0644)
+	os.WriteFile(filepath.Join(dir, "HANDOFF-m1.md"), []byte("Note 1"), 0644)
+	os.WriteFile(filepath.Join(dir, "HANDOFF-m2.md"), []byte("Note 2"), 0644)
 
 	notes, err := Collect(dir)
 	if err != nil {
@@ -76,5 +74,21 @@ func TestCollectMultiple(t *testing.T) {
 	}
 	if len(notes) != 2 {
 		t.Fatalf("expected 2, got %d", len(notes))
+	}
+}
+
+func TestCollectSkipsNonHandoffPrefix(t *testing.T) {
+	dir, _ := os.MkdirTemp("", "handoff-*")
+	defer os.RemoveAll(dir)
+	os.WriteFile(filepath.Join(dir, "README.md"), []byte("readme"), 0644)
+	os.WriteFile(filepath.Join(dir, "PLAN.md"), []byte("plan"), 0644)
+	os.WriteFile(filepath.Join(dir, "HANDOFF-m1.md"), []byte("handoff"), 0644)
+
+	notes, err := Collect(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(notes) != 1 {
+		t.Fatalf("expected 1, got %d", len(notes))
 	}
 }

@@ -35,16 +35,24 @@ func buildReviewPrompt(reviewType string, projectName string, milestones []conte
 	}
 
 	target := projectName
+
+	var instruction string
+	if reviewType == "phase" {
+		instruction = fmt.Sprintf("Code review and quality checks should have already been completed during the milestone implementation.\nPlease perform a lightweight phase completion check:\n1. Confirm all milestone specs are met\n2. Confirm code is production-ready\n3. Note any follow-up items for upcoming milestones\nWrite your assessment to `.orc_history/HANDOFF-%s.md`.", projectName)
+	} else {
+		instruction = fmt.Sprintf("Please perform a %s review and provide feedback. Write your review to `.orc_history/HANDOFF-%s.md`.", reviewType, projectName)
+	}
+
 	prompt := fmt.Sprintf(
-		"Review: %s for %s\n\n## Context Bundle\n\n%s\n\nPlease perform a %s review and provide feedback. Write your review to HANDOFF.md in the current directory.",
-		reviewType, target, bundle, reviewType,
+		"Review: %s for %s\n\n## Context Bundle\n\n%s\n\n%s",
+		reviewType, target, bundle, instruction,
 	)
 	return bundle, prompt
 }
 
-func Phase(milestoneName, milestoneSpec, workDir string, handoffNotes []handoff.Note, verifyResults []verify.Result) (*Result, error) {
+func Phase(milestoneID, milestoneName, milestoneSpec, workDir string, handoffNotes []handoff.Note, verifyResults []verify.Result) (*Result, error) {
 	ms := []context.MilestoneInfo{{Name: milestoneName, Spec: milestoneSpec}}
-	_, prompt := buildReviewPrompt("phase", milestoneName, ms, handoffNotes, verifyResults)
+	_, prompt := buildReviewPrompt("phase", milestoneID, ms, handoffNotes, verifyResults)
 	result, err := session.Run(milestoneName+"-review", prompt, workDir, 5*time.Minute)
 	if err != nil {
 		return nil, err

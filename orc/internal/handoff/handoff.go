@@ -24,7 +24,8 @@ func Collect(root string) ([]Note, error) {
 		if fi.IsDir() {
 			return nil
 		}
-		if strings.ToUpper(filepath.Base(path)) == "HANDOFF.MD" {
+		base := strings.ToUpper(filepath.Base(path))
+		if strings.HasPrefix(base, "HANDOFF") && strings.HasSuffix(base, ".MD") {
 			data, err := os.ReadFile(path)
 			if err != nil {
 				return nil

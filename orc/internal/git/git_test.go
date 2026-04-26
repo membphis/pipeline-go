@@ -17,7 +17,7 @@ func TestRepoInit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := runInDir(dir, "rev-parse", "--is-bare-repository")
+	out, err := RunInDir(dir, "rev-parse", "--is-bare-repository")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,12 +40,23 @@ func TestInitCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := runInDir(dir, "log", "--oneline")
+	out, err := RunInDir(dir, "log", "--oneline")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out, "init") {
 		t.Fatalf("expected commit message 'init', got %q", out)
+	}
+
+	// Verify scaffold files
+	if _, err := os.Stat(dir + "/README.md"); err != nil {
+		t.Fatal("expected README.md to exist")
+	}
+	if _, err := os.Stat(dir + "/.gitignore"); err != nil {
+		t.Fatal("expected .gitignore to exist")
+	}
+	if _, err := os.Stat(dir + "/.orc_history/.gitignore"); err != nil {
+		t.Fatal("expected .orc_history/.gitignore to exist")
 	}
 }
 
@@ -66,7 +77,7 @@ func TestTag(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := runInDir(dir, "tag")
+	out, err := RunInDir(dir, "tag")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"orc/internal/context"
 	"orc/internal/git"
 	"orc/internal/handoff"
 	"orc/internal/log"
@@ -120,7 +119,6 @@ func (p *Pipeline) Run() int {
 					allHandoffNotes = append(allHandoffNotes, n)
 				}
 			}
-			copyPLANMD(root, cwd)
 			continue
 		}
 
@@ -145,7 +143,6 @@ func (p *Pipeline) Run() int {
 		}
 		pipeState.Set(msID, state.StatusCompleted)
 		pipeState.Save()
-		copyPLANMD(root, cwd)
 
 		if ms.Verify != nil {
 			vResults, err := verify.Run(ms.Verify, 0, root)
@@ -164,16 +161,15 @@ func (p *Pipeline) Run() int {
 				allHandoffNotes = append(allHandoffNotes, n)
 			}
 		}
-	}
 
-	var msInfos []context.MilestoneInfo
-	for _, ms := range projectSpec.Milestones {
-		msInfos = append(msInfos, context.MilestoneInfo{Name: ms.Name, Spec: buildSpecContent(&ms, cwd)})
+		if _, err := review.Phase(ms.ID, ms.Name, buildSpecContent(ms, cwd), root, allHandoffNotes, allVerifyResults); err != nil {
+			p.logger.Warn("phase review failed", "name", msID, "error", err)
+		} else {
+			p.logger.Info("phase review completed", "name", msID)
+		}
 	}
-	review.Final(projectSpec.Project.Name, root, msInfos, allHandoffNotes, allVerifyResults)
 
 	if pipeState.AllCompleted() {
-		git.Tag(root, projectSpec.Project.Name+"-v1.0")
 		p.logger.Info("pipeline completed successfully")
 		return 0
 	}
@@ -270,29 +266,30 @@ func computeMilestoneSpec(ms *spec.Milestone, all []spec.Milestone, pipeState *s
 	parts = append(parts, "## Development Process\n")
 	parts = append(parts, "### Phase 1: Plan\n")
 	parts = append(parts, "1. Load the `writing-plans` skill and create a detailed implementation plan\n")
-	parts = append(parts, "2. Write the plan to `PLAN.md` in the project root\n")
+	parts = append(parts, "2. Write the plan to `.orc_history/PLAN.md`\n")
 	parts = append(parts, "3. **When writing-plans presents its \"Execution Handoff\" question, choose \"Inline Execution\" and proceed immediately to Phase 2 — do not ask the user**\n\n")
 	parts = append(parts, "### Phase 2: Execute\n")
 	parts = append(parts, "1. Load the `executing-plans` skill and execute `PLAN.md` using **inline** mode\n")
 	parts = append(parts, "2. Follow the plan step by step to implement the spec\n")
 	parts = append(parts, "3. Write tests first (TDD), implement, verify\n")
 	parts = append(parts, "4. Do NOT commit yet — review comes next\n\n")
-	parts = append(parts, "### Phase 3: Code Review & Quality\n")
-	parts = append(parts, "1. Detect the project's language and run the appropriate static analysis / linter — fix all issues\n")
-	parts = append(parts, "2. Run the project's code formatter — fix all formatting issues\n")
-	parts = append(parts, "3. Run the project's build command — confirm compilation passes\n")
-	parts = append(parts, "4. Load the `requesting-code-review` skill\n")
-	parts = append(parts, "5. Review all changes:\n")
+	parts = append(parts, "### Phase 3: Quality\n")
+	parts = append(parts, "1. Load the `verification-before-completion` skill\n")
+	parts = append(parts, "2. Run all quality checks — fix ALL issues immediately before proceeding\n")
+	parts = append(parts, "3. Do NOT proceed until all checks pass\n\n")
+	parts = append(parts, "### Phase 4: Code Review\n")
+	parts = append(parts, "1. Load the `requesting-code-review` skill\n")
+	parts = append(parts, "2. Review all changes:\n")
 	parts = append(parts, "   - Get git SHAs: `BASE_SHA=$(git rev-parse HEAD~1)` and `HEAD_SHA=$(git rev-parse HEAD)`\n")
 	parts = append(parts, "   - Check spec compliance — every requirement implemented, no scope creep\n")
 	parts = append(parts, "   - Check code quality — error handling, edge cases, test coverage\n")
 	parts = append(parts, "   - Categorize issues: Critical (must fix), Important (should fix), Minor (nice to have)\n")
-	parts = append(parts, "6. Fix all Critical and Important issues\n")
-	parts = append(parts, "7. Re-review if fixes were needed\n\n")
-	parts = append(parts, "### Phase 4: Commit\n")
+	parts = append(parts, "3. Fix all Critical and Important issues\n")
+	parts = append(parts, "4. Re-review if fixes were needed\n\n")
+	parts = append(parts, "### Phase 5: Commit\n")
 	parts = append(parts, "1. Stage all reviewed changes with `git add`\n")
 	parts = append(parts, "2. Commit with a descriptive message\n")
-	parts = append(parts, "3. Write review notes to HANDOFF.md documenting the review outcome\n")
+	parts = append(parts, fmt.Sprintf("3. Write review notes to `.orc_history/HANDOFF-%s.md` documenting the review outcome\n", ms.ID))
 
 	if pipeState != nil {
 		parts = append(parts, "## Pipeline State\n")
@@ -322,17 +319,6 @@ func computeMilestoneSpec(ms *spec.Milestone, all []spec.Milestone, pipeState *s
 	}
 
 	return strings.TrimSpace(strings.Join(parts, "\n"))
-}
-
-// copyPLANMD copies PLAN.md from root to cwd if it exists.
-func copyPLANMD(root, cwd string) {
-	src := filepath.Join(root, "PLAN.md")
-	dst := filepath.Join(cwd, "PLAN.md")
-	data, err := os.ReadFile(src)
-	if err != nil {
-		return
-	}
-	os.WriteFile(dst, data, 0644)
 }
 
 func buildSpecContent(ms *spec.Milestone, cwd string) string {
