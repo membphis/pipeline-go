@@ -17,6 +17,7 @@ type SpecItem struct {
 	Description string `yaml:"description"`
 	SpecFile    string `yaml:"spec_file"`
 	TaskCount   int    `yaml:"task_count"`
+	TestCount   int    `yaml:"test_count,omitempty"`
 	EstMinutes  int    `yaml:"est_minutes"`
 }
 

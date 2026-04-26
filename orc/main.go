@@ -12,11 +12,9 @@ func main() {
 	specPath := flag.String("spec", "project.yaml", "Path to project.yaml")
 	specShort := flag.String("s", "project.yaml", "Path to project.yaml (shorthand)")
 	root := flag.String("root", ".", "Project root directory")
-	branch := flag.String("branch", "", "Use existing branch instead of creating milestone branches")
 	flag.Parse()
 
 	log.Setup()
-	logger := log.Get("main")
 
 	var extraSpecs []string
 	args := flag.Args()
@@ -29,7 +27,6 @@ func main() {
 
 	finalSpec := *specPath
 	if *specShort != "project.yaml" {
-		_ = logger
 		finalSpec = *specShort
 	}
 
@@ -37,7 +34,6 @@ func main() {
 		SpecPath:   finalSpec,
 		Root:       *root,
 		ExtraSpecs: extraSpecs,
-		Branch:     *branch,
 	}
 
 	p := pipeline.New(cfg)

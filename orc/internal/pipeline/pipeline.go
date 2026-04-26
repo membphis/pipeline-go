@@ -23,7 +23,6 @@ type Config struct {
 	SpecPath   string
 	Root       string
 	ExtraSpecs []string
-	Branch     string
 }
 
 type Pipeline struct {
@@ -74,7 +73,6 @@ func (p *Pipeline) Run() int {
 	p.logger.Info("milestone order", "order", fmt.Sprintf("%v", ordered))
 
 	pipeState := state.New(ids, filepath.Join(p.Config.Root, "state.yaml"))
-	defaultBranch := detectDefaultBranch()
 
 	seenHandoffPaths := make(map[string]bool)
 	var allHandoffNotes []handoff.Note
@@ -90,30 +88,9 @@ func (p *Pipeline) Run() int {
 		pipeState.Set(msID, state.StatusInProgress)
 		pipeState.Save()
 
-		var branchName string
-		if p.Config.Branch != "" {
-			branchName = p.Config.Branch
-			if !git.IsClean() {
-				p.logger.Warn("working tree not clean")
-			}
-		} else {
-			branchName = msID + "-pipeline"
-			if err := git.Checkout(defaultBranch); err != nil {
-				p.logger.Error("checkout failed", "branch", defaultBranch, "error", err)
-				return 1
-			}
-			if err := git.CreateBranch(branchName); err != nil {
-				p.logger.Error("create branch failed", "branch", branchName, "error", err)
-				return 1
-			}
-		}
-
-		p.logger.Info("starting milestone", "name", msID, "branch", branchName)
+		p.logger.Info("starting milestone", "name", msID)
 		prompt := computeMilestoneSpec(ms, projectSpec.Milestones, pipeState, allHandoffNotes, p.Config.Root)
 		p.logger.Info("running milestone", "name", msID, "prompt_bytes", len(prompt))
-		fmt.Println("========= PROMPT =========")
-		fmt.Println(prompt)
-		fmt.Println("==========================")
 
 		result, err := session.Run(prompt, 0)
 		if err != nil || result.ReturnCode != 0 {
@@ -147,27 +124,6 @@ func (p *Pipeline) Run() int {
 		allHandoffNotes = append(allHandoffNotes, deduped...)
 
 		review.Phase(msID, buildSpecContent(ms, p.Config.Root), deduped, allVerifyResults)
-
-		if p.Config.Branch == "" {
-			if err := git.AddAll(); err != nil {
-				p.logger.Error("git add failed", "error", err)
-				return 1
-			}
-			if err := git.Commit("Milestone " + msID); err != nil {
-				p.logger.Error("commit failed", "error", err)
-				return 1
-			}
-			if err := git.Tag(msID + "-done"); err != nil {
-				p.logger.Warn("tag failed", "error", err)
-			}
-			if err := git.Checkout(defaultBranch); err != nil {
-				p.logger.Error("checkout failed", "error", err)
-				return 1
-			}
-			if err := git.SquashMerge(branchName); err != nil {
-				p.logger.Warn("squash merge failed", "error", err)
-			}
-		}
 	}
 
 	var msInfos []context.MilestoneInfo
@@ -188,18 +144,6 @@ func (p *Pipeline) Run() int {
 	return 0
 }
 
-func detectDefaultBranch() string {
-	for _, name := range []string{"main", "master"} {
-		if git.BranchExists(name) {
-			return name
-		}
-	}
-	if b, err := git.CurrentBranch(); err == nil {
-		return b
-	}
-	return "main"
-}
-
 func computeMilestoneSpec(ms *spec.Milestone, all []spec.Milestone, pipeState *state.State, handoffNotes []handoff.Note, rootDir string) string {
 	var parts []string
 
@@ -210,12 +154,30 @@ func computeMilestoneSpec(ms *spec.Milestone, all []spec.Milestone, pipeState *s
 		for _, s := range ms.Specs {
 			parts = append(parts, fmt.Sprintf("### %s: %s\n", s.ID, s.Description))
 			parts = append(parts, fmt.Sprintf("- Tasks: %d | Est: %d min\n", s.TaskCount, s.EstMinutes))
+			if s.TestCount > 0 {
+				parts = append(parts, fmt.Sprintf("- Tests: %d\n", s.TestCount))
+			}
 			if s.SpecFile != "" {
 				specPath := filepath.Join(rootDir, s.SpecFile)
 				data, err := os.ReadFile(specPath)
 				if err == nil {
 					parts = append(parts, "\n"+string(data)+"\n")
 				}
+			}
+		}
+	}
+
+	if hasTests(ms.Specs) {
+		parts = append(parts, "## Development Process\n")
+		parts = append(parts, "Follow Test-Driven Development (TDD):\n")
+		parts = append(parts, "1. Write failing tests first\n")
+		parts = append(parts, "2. Verify they fail correctly\n")
+		parts = append(parts, "3. Write minimal implementation to pass\n")
+		parts = append(parts, "4. Verify all tests pass\n")
+		parts = append(parts, "5. Refactor while keeping tests green\n\n")
+		for _, s := range ms.Specs {
+			if s.TestCount > 0 {
+				parts = append(parts, fmt.Sprintf("For %s: generate %d test cases before implementation.\n", s.ID, s.TestCount))
 			}
 		}
 	}
@@ -263,6 +225,9 @@ func buildSpecContent(ms *spec.Milestone, rootDir string) string {
 	for _, s := range ms.Specs {
 		parts = append(parts, fmt.Sprintf("### %s: %s\n", s.ID, s.Description))
 		parts = append(parts, fmt.Sprintf("- Tasks: %d | Est: %d min\n", s.TaskCount, s.EstMinutes))
+		if s.TestCount > 0 {
+			parts = append(parts, fmt.Sprintf("- Tests: %d\n", s.TestCount))
+		}
 		if s.SpecFile != "" {
 			specPath := filepath.Join(rootDir, s.SpecFile)
 			data, err := os.ReadFile(specPath)
@@ -272,6 +237,15 @@ func buildSpecContent(ms *spec.Milestone, rootDir string) string {
 		}
 	}
 	return strings.TrimSpace(strings.Join(parts, "\n"))
+}
+
+func hasTests(specs []spec.SpecItem) bool {
+	for _, s := range specs {
+		if s.TestCount > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func truncate(s string, max int) string {
