@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 
 	"orc/internal/log"
@@ -11,8 +12,14 @@ import (
 func main() {
 	specPath := flag.String("spec", "project.yaml", "Path to project.yaml")
 	specShort := flag.String("s", "project.yaml", "Path to project.yaml (shorthand)")
-	root := flag.String("root", ".", "Project root directory")
+	root := flag.String("root", "", "Project root directory (required)")
 	flag.Parse()
+
+	if *root == "" {
+		fmt.Fprintln(os.Stderr, "ERROR: --root is required")
+		flag.Usage()
+		os.Exit(1)
+	}
 
 	log.Setup()
 
