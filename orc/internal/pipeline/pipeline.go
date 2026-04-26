@@ -173,6 +173,13 @@ func (p *Pipeline) Run() int {
 		pipeState.Set(msID, state.StatusCompleted)
 		pipeState.Save()
 
+		planPath := filepath.Join(root, ".orc_history", "PLAN.md")
+		if err := os.Remove(planPath); err != nil && !os.IsNotExist(err) {
+			p.logger.Warn("failed to remove PLAN.md", "path", planPath, "error", err)
+		} else {
+			p.logger.Debug("removed PLAN.md after milestone", "name", msID)
+		}
+
 		if ms.Verify != nil {
 			vResults, err := verify.Run(ms.Verify, 0, root)
 			if err == nil {
