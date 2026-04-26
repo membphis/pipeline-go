@@ -120,6 +120,7 @@ func (p *Pipeline) Run() int {
 					allHandoffNotes = append(allHandoffNotes, n)
 				}
 			}
+			copyPLANMD(root, cwd)
 			continue
 		}
 
@@ -144,6 +145,7 @@ func (p *Pipeline) Run() int {
 		}
 		pipeState.Set(msID, state.StatusCompleted)
 		pipeState.Save()
+		copyPLANMD(root, cwd)
 
 		if ms.Verify != nil {
 			vResults, err := verify.Run(ms.Verify, 0, root)
@@ -320,6 +322,17 @@ func computeMilestoneSpec(ms *spec.Milestone, all []spec.Milestone, pipeState *s
 	}
 
 	return strings.TrimSpace(strings.Join(parts, "\n"))
+}
+
+// copyPLANMD copies PLAN.md from root to cwd if it exists.
+func copyPLANMD(root, cwd string) {
+	src := filepath.Join(root, "PLAN.md")
+	dst := filepath.Join(cwd, "PLAN.md")
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return
+	}
+	os.WriteFile(dst, data, 0644)
 }
 
 func buildSpecContent(ms *spec.Milestone, cwd string) string {
